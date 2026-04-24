@@ -738,79 +738,148 @@ def _element_centroid(el: etree._Element) -> tuple[float, float] | None:
     return (sum(xs) / len(xs), sum(ys) / len(ys))
 
 
-def _path_length(el: etree._Element) -> float:
-    """Return the Euclidean length of a path (start-to-end straight-line distance).
+def _path_anchor_points(d: str) -> list[tuple[float, float]]:
+    """Return the on-curve anchor points of a path, normalised to absolute first.
 
-    For V1, length is defined as the distance between the first and last
-    coordinate pairs in the path (ignoring intermediate points / curves).
-    This matches the spec's expectation for straight seam lines.
-
-    Raises GeometryError if the path has fewer than 2 coordinate pairs.
+    For each command repetition, only the endpoint is included — Bezier control
+    points are skipped.  This gives exact arc length for M/L paths and a
+    chord-length lower-bound approximation for curved segments (spec-10 handles
+    full Bezier arc length).
     """
-    d = el.get("d", "")
-    commands = _parse_path_d(d)
-    all_coords: list[tuple[float, float]] = []
+    d_norm = _transform_path_coords(d, lambda x, y: (x, y))
+    commands = _parse_path_d(d_norm)
 
+    # pairs per command repetition / which pair (0-indexed) is the endpoint
+    _STRIDE: dict[str, int] = {"M": 1, "L": 1, "C": 3, "S": 2, "Q": 2, "T": 1}
+    _EP: dict[str, int] = {"M": 0, "L": 0, "C": 2, "S": 1, "Q": 1, "T": 0}
+
+    anchors: list[tuple[float, float]] = []
     for cmd, nums in commands:
         upper = cmd.upper()
-        if upper == "Z":
-            continue
+        if upper not in _STRIDE:
+            continue  # Z, A (H/V already normalised to L)
+        stride = _STRIDE[upper]
+        ep = _EP[upper]
+        stride_floats = stride * 2
         i = 0
-        while i + 1 < len(nums):
-            all_coords.append((nums[i], nums[i + 1]))
-            i += 2
+        while i < len(nums):
+            ep_i = i + ep * 2
+            if ep_i + 1 < len(nums):
+                anchors.append((nums[ep_i], nums[ep_i + 1]))
+            i += stride_floats
 
-    if len(all_coords) < 2:
+    return anchors
+
+
+def _path_length(el: etree._Element) -> float:
+    """Return the polyline arc length of a path element.
+
+    Arc length is the sum of Euclidean distances between consecutive on-curve
+    anchor points.  For Bezier commands only the segment endpoint is used
+    (chord-length approximation); full Bezier arc length is deferred to spec-10.
+
+    Raises GeometryError if the path has fewer than 2 anchor points.
+    """
+    anchors = _path_anchor_points(el.get("d", ""))
+    if len(anchors) < 2:
         raise GeometryError("Path has fewer than 2 coordinates; cannot measure length")
-
-    start = np.array(all_coords[0])
-    end = np.array(all_coords[-1])
-    return float(np.linalg.norm(end - start))
+    return sum(
+        float(np.linalg.norm(np.array(anchors[i + 1]) - np.array(anchors[i])))
+        for i in range(len(anchors) - 1)
+    )
 
 
 def _adjust_path_endpoint_length(el: etree._Element, target_length: float) -> None:
-    """Move the endpoint of a path in-place so its length equals ``target_length``.
+    """Move the endpoint of a path in-place so its polyline arc length equals target_length.
 
-    The start point is fixed.  The endpoint is moved along the vector from
-    start→end, scaled to ``target_length``.
+    All intermediate anchor points are held fixed.  For extension, the last
+    segment is lengthened in its own direction.  For shortening, the path is
+    truncated at the correct arc position with the final point interpolated.
+
+    Chord-length approximation is used for Bezier segments (spec-10 will fix).
     """
     d = el.get("d", "")
-    commands = _parse_path_d(d)
-    all_coords: list[tuple[float, float]] = []
+    # Normalise to absolute/uppercase so index arithmetic is straightforward
+    d_norm = _transform_path_coords(d, lambda x, y: (x, y))
+    commands = list(_parse_path_d(d_norm))
+    anchors = _path_anchor_points(d)
 
-    for cmd, nums in commands:
-        upper = cmd.upper()
-        if upper == "Z":
-            continue
-        i = 0
-        while i + 1 < len(nums):
-            all_coords.append((nums[i], nums[i + 1]))
-            i += 2
-
-    if len(all_coords) < 2:
+    if len(anchors) < 2:
         raise GeometryError("Path has fewer than 2 coordinates; cannot adjust length")
 
-    start = np.array(all_coords[0], dtype=float)
-    end = np.array(all_coords[-1], dtype=float)
-    vec = end - start
-    vec_len = float(np.linalg.norm(vec))
+    # Build cumulative arc lengths
+    cumulative = [0.0]
+    for i in range(1, len(anchors)):
+        seg = float(np.linalg.norm(np.array(anchors[i]) - np.array(anchors[i - 1])))
+        cumulative.append(cumulative[-1] + seg)
 
-    if vec_len < 1e-9:
+    total = cumulative[-1]
+    if total < 1e-9:
         raise GeometryError("Cannot adjust endpoint of a zero-length path")
 
-    # New endpoint along same direction, at target_length distance from start
-    new_end = start + (vec / vec_len) * target_length
+    if target_length >= total:
+        # Extend: move the last anchor along the last segment's direction
+        p0 = np.array(anchors[-2], dtype=float)
+        p1 = np.array(anchors[-1], dtype=float)
+        seg_vec = p1 - p0
+        seg_len = float(np.linalg.norm(seg_vec))
+        if seg_len < 1e-9:
+            raise GeometryError("Cannot extend: last segment has zero length")
+        extra = target_length - cumulative[-2]
+        new_end = p0 + (seg_vec / seg_len) * extra
+        anchor_idx = len(anchors) - 1  # update the last anchor in the command list
+    else:
+        # Shorten: find which segment contains the target, interpolate
+        new_end = np.array(anchors[0], dtype=float)
+        anchor_idx = 1
+        for i in range(1, len(anchors)):
+            if cumulative[i] >= target_length:
+                seg_len = cumulative[i] - cumulative[i - 1]
+                t = (target_length - cumulative[i - 1]) / seg_len
+                new_end = np.array(anchors[i - 1]) + t * (
+                    np.array(anchors[i]) - np.array(anchors[i - 1])
+                )
+                anchor_idx = i
+                break
 
-    # Rewrite the last coordinate pair in the command list
-    # Walk backward through commands to find the last pair
-    for i in reversed(range(len(commands))):
-        cmd, nums = commands[i]
-        upper = cmd.upper()
-        if upper in ("Z",) or not nums:
-            continue
-        # Find the last pair in this command's numbers
-        if len(nums) >= 2:
-            commands[i] = (cmd, list(nums[:-2]) + [float(new_end[0]), float(new_end[1])])
+    # Rewrite commands: find the command whose endpoint is anchor_idx and update it;
+    # drop any commands beyond that point.
+    _STRIDE: dict[str, int] = {"M": 1, "L": 1, "C": 3, "S": 2, "Q": 2, "T": 1}
+    _EP: dict[str, int] = {"M": 0, "L": 0, "C": 2, "S": 1, "Q": 1, "T": 0}
+
+    ai = 0  # current anchor index
+    new_commands: list[tuple[str, list[float]]] = []
+    done = False
+
+    for cmd, nums in commands:
+        if done:
             break
+        upper = cmd.upper()
+        if upper not in _STRIDE:
+            new_commands.append((cmd, list(nums)))
+            continue
 
-    el.set("d", _serialise_path_d(commands))
+        stride = _STRIDE[upper]
+        ep = _EP[upper]
+        stride_floats = stride * 2
+        new_nums: list[float] = []
+        i = 0
+
+        while i < len(nums) and not done:
+            ep_i = i + ep * 2
+            if ep_i + 1 >= len(nums):
+                break
+            if ai == anchor_idx:
+                # Replace this endpoint with new_end; keep preceding params in repetition
+                new_nums.extend(nums[i:ep_i])
+                new_nums.extend([float(new_end[0]), float(new_end[1])])
+                done = True
+            else:
+                new_nums.extend(nums[i : i + stride_floats])
+                ai += 1
+            i += stride_floats
+
+        if new_nums:
+            new_commands.append((upper, new_nums))
+
+    el.set("d", _serialise_path_d(new_commands))

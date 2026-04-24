@@ -16,6 +16,7 @@ Acceptance criteria coverage:
 
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 import numpy as np
@@ -1043,3 +1044,65 @@ class TestTranslateGroup:
         # Original M 200,10 → M 220,40
         assert "220" in d
         assert "40" in d
+
+
+# ---------------------------------------------------------------------------
+# true_seam_length — polyline arc length correctness (multi-segment paths)
+# ---------------------------------------------------------------------------
+
+
+def _arc_length(coords: list[tuple[float, float]]) -> float:
+    """Sum of Euclidean distances between consecutive coordinate pairs."""
+    return sum(
+        math.sqrt((coords[i][0] - coords[i - 1][0]) ** 2 + (coords[i][1] - coords[i - 1][1]) ** 2)
+        for i in range(1, len(coords))
+    )
+
+
+class TestTrueSeamLengthPolyline:
+    """true_seam_length must use polyline arc length, not start-to-end Euclidean.
+
+    A zigzag path M 0,0 L 3,4 L 0,8 has polyline length 10 (5+5) but
+    start-to-end distance of only 8.  All adjustments must use arc length.
+    """
+
+    def _zigzag_pattern(self) -> Pattern:
+        svg_str = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+  <path id="seam-zigzag" d="M 0,0 L 3,4 L 0,8"/>
+  <path id="target-12" d="M 0,0 L 12,0"/>
+  <path id="target-6" d="M 0,0 L 6,0"/>
+</svg>"""
+        return load_pattern_from_string(svg_str)
+
+    def test_multisegment_length_measured_correctly(self) -> None:
+        """true_seam_length treats M 0,0 L 3,4 L 0,8 as length 10, not 8."""
+        p = self._zigzag_pattern()
+        # Extend zigzag (arc length 10) to match target-12 (length 12)
+        p2 = true_seam_length(p, "seam-zigzag", "target-12")
+        coords = _extract_path_coords(get_element(p2, "seam-zigzag").get("d"))
+        assert (
+            abs(_arc_length(coords) - 12.0) < 1e-4
+        ), f"Expected arc length 12, got {_arc_length(coords)}"
+
+    def test_multisegment_shortening_uses_arc_length(self) -> None:
+        """Shortening a zigzag to 6 places the new endpoint inside the last segment."""
+        p = self._zigzag_pattern()
+        # Shorten zigzag (arc length 10) to 6
+        p2 = true_seam_length(p, "seam-zigzag", "target-6")
+        coords = _extract_path_coords(get_element(p2, "seam-zigzag").get("d"))
+        assert (
+            abs(_arc_length(coords) - 6.0) < 1e-4
+        ), f"Expected arc length 6, got {_arc_length(coords)}"
+
+    def test_single_segment_unchanged(self) -> None:
+        """Single-segment paths still work correctly after the fix."""
+        svg_str = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+  <path id="seam-a" d="M 0,0 L 10,0"/>
+  <path id="seam-b" d="M 0,0 L 12,0"/>
+</svg>"""
+        p = load_pattern_from_string(svg_str)
+        p2 = true_seam_length(p, "seam-a", "seam-b")
+        coords = _extract_path_coords(get_element(p2, "seam-a").get("d"))
+        assert abs(_arc_length(coords) - 12.0) < 1e-4
