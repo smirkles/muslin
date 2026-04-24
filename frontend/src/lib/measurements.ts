@@ -75,9 +75,9 @@ export function validateMeasurements(
   for (const key of FIELD_ORDER) {
     const { min, max } = FIELD_META[key];
     const val = values[key];
-    if (val === undefined || val === null || isNaN(val as number)) {
+    if (val === undefined || val === null || isNaN(val)) {
       errors[key] = `Required`;
-    } else if ((val as number) < min || (val as number) > max) {
+    } else if (val < min || val > max) {
       errors[key] = `Must be between ${min} and ${max} cm`;
     } else {
       errors[key] = undefined;

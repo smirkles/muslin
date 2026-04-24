@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MeasurementForm } from "./MeasurementForm";
+import { FIELD_META } from "../lib/measurements";
 
 const FIELD_LABELS = [
   "Full bust",
@@ -23,22 +24,19 @@ const VALID_VALUES = {
   "Back length": "39.5",
 };
 
-function fillAllFields(user: ReturnType<typeof userEvent.setup>) {
-  return async () => {
-    for (const [label, value] of Object.entries(VALID_VALUES)) {
-      const input = screen.getByLabelText(new RegExp(label, "i"));
-      await user.clear(input);
-      await user.type(input, value);
-    }
-  };
-}
-
 describe("MeasurementForm", () => {
   describe("rendering", () => {
     it("renders all 7 labelled fields", () => {
       render(<MeasurementForm onSubmit={vi.fn()} />);
       FIELD_LABELS.forEach((label) => {
         expect(screen.getByLabelText(new RegExp(label, "i"))).toBeTruthy();
+      });
+    });
+
+    it("renders helper text for all 7 fields", () => {
+      render(<MeasurementForm onSubmit={vi.fn()} />);
+      Object.values(FIELD_META).forEach(({ helper }) => {
+        expect(screen.getByText(helper)).toBeTruthy();
       });
     });
 
@@ -71,6 +69,16 @@ describe("MeasurementForm", () => {
       const input = screen.getByLabelText(/bust point to bust point/i);
       await user.clear(input);
       await user.type(input, "9");
+      await user.tab();
+      expect(screen.getByText(/must be between/i)).toBeTruthy();
+    });
+
+    it("shows error for bust_cm above maximum after blur", async () => {
+      const user = userEvent.setup();
+      render(<MeasurementForm onSubmit={vi.fn()} />);
+      const input = screen.getByLabelText(/full bust/i);
+      await user.clear(input);
+      await user.type(input, "201");
       await user.tab();
       expect(screen.getByText(/must be between/i)).toBeTruthy();
     });

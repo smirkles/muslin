@@ -84,6 +84,9 @@ describe("validateMeasurements", () => {
   it("accepts waist_cm at minimum (40)", () => {
     expect(validateMeasurements({ ...VALID, waist_cm: 40 }).waist_cm).toBeUndefined();
   });
+  it("accepts waist_cm at maximum (200)", () => {
+    expect(validateMeasurements({ ...VALID, waist_cm: 200 }).waist_cm).toBeUndefined();
+  });
   it("rejects waist_cm below minimum (39)", () => {
     expect(validateMeasurements({ ...VALID, waist_cm: 39 }).waist_cm).toBeDefined();
   });
@@ -92,8 +95,17 @@ describe("validateMeasurements", () => {
   });
 
   // hip_cm: 60–200
+  it("accepts hip_cm at minimum (60)", () => {
+    expect(validateMeasurements({ ...VALID, hip_cm: 60 }).hip_cm).toBeUndefined();
+  });
+  it("accepts hip_cm at maximum (200)", () => {
+    expect(validateMeasurements({ ...VALID, hip_cm: 200 }).hip_cm).toBeUndefined();
+  });
   it("rejects hip_cm below minimum (59)", () => {
     expect(validateMeasurements({ ...VALID, hip_cm: 59 }).hip_cm).toBeDefined();
+  });
+  it("rejects hip_cm above maximum (201)", () => {
+    expect(validateMeasurements({ ...VALID, hip_cm: 201 }).hip_cm).toBeDefined();
   });
 
   // height_cm: 120–220
@@ -118,6 +130,16 @@ describe("validateMeasurements", () => {
     expect(
       validateMeasurements({ ...VALID, back_length_cm: 30 }).back_length_cm,
     ).toBeUndefined();
+  });
+  it("accepts back_length_cm at maximum (60)", () => {
+    expect(
+      validateMeasurements({ ...VALID, back_length_cm: 60 }).back_length_cm,
+    ).toBeUndefined();
+  });
+  it("rejects back_length_cm below minimum (29)", () => {
+    expect(
+      validateMeasurements({ ...VALID, back_length_cm: 29 }).back_length_cm,
+    ).toBeDefined();
   });
   it("rejects back_length_cm above maximum (61)", () => {
     expect(
