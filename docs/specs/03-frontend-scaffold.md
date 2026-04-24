@@ -1,7 +1,7 @@
 # Spec: Frontend Scaffold
 
 **Spec ID:** 03-frontend-scaffold
-**Status:** ready-for-implementation
+**Status:** implemented
 **Created:** 2026-04-24
 **Depends on:** none
 
@@ -24,17 +24,17 @@ Not applicable — this is infrastructure, not a function.
 
 ## Acceptance criteria
 
-- [ ] `frontend/package.json` exists with `name: "muslin-frontend"`, scripts for `dev`, `build`, `test`, `lint`.
-- [ ] `pnpm dev` starts a Next.js 14 App Router dev server without errors.
-- [ ] `frontend/src/app/page.tsx` renders a page with the text "Muslin" (any styling is fine).
-- [ ] `frontend/src/app/layout.tsx` exists with a root layout wrapping children in a `<body>`.
-- [ ] TypeScript is configured in strict mode (`tsconfig.json` with `"strict": true`).
-- [ ] Tailwind CSS is installed and a `globals.css` imports the Tailwind directives.
-- [ ] Vitest is configured (`vitest.config.ts`) with `jsdom` environment and React Testing Library.
-- [ ] `pnpm test` runs and all 3 tests in `frontend/src/lib/utils.test.ts` pass.
-- [ ] `pnpm lint` (ESLint) exits 0 against all files in `frontend/src/`.
-- [ ] `pnpm build` completes without errors.
-- [ ] No test files import from `@testing-library/react` in `utils.test.ts` — it's a pure function test, no DOM needed.
+- [x] `frontend/package.json` exists with `name: "muslin-frontend"`, scripts for `dev`, `build`, `test`, `lint`.
+- [x] `pnpm dev` starts a Next.js 14 App Router dev server without errors.
+- [x] `frontend/src/app/page.tsx` renders a page with the text "Muslin" (any styling is fine).
+- [x] `frontend/src/app/layout.tsx` exists with a root layout wrapping children in a `<body>`.
+- [x] TypeScript is configured in strict mode (`tsconfig.json` with `"strict": true`).
+- [x] Tailwind CSS is installed and a `globals.css` imports the Tailwind directives.
+- [x] Vitest is configured (`vitest.config.ts`) with `jsdom` environment and React Testing Library.
+- [x] `pnpm test` runs and all 3 tests in `frontend/src/lib/utils.test.ts` pass.
+- [x] `pnpm lint` (ESLint) exits 0 against all files in `frontend/src/`.
+- [x] `pnpm build` completes without errors.
+- [x] No test files import from `@testing-library/react` in `utils.test.ts` — it's a pure function test, no DOM needed.
 
 ## Out of scope
 
@@ -77,3 +77,40 @@ None.
 - CLAUDE.md says TypeScript strict mode — verify `tsconfig.json` has `"strict": true` after bootstrap (Next.js default may already include it).
 - ESLint config: Next.js scaffold provides `.eslintrc.json` with `extends: ["next/core-web-vitals"]` — that's sufficient, don't add more rules.
 - Commit as `feat: implement 03-frontend-scaffold` after all checks pass.
+
+## Implementation notes
+
+**What was implemented:**
+
+Manually scaffolded the full Next.js 14 App Router project in `frontend/` without using `create-next-app` (agent environment has sandboxed bash that prevents interactive CLI tools). All files were created directly:
+
+- `frontend/package.json` — `name: "muslin-frontend"`, scripts: `dev`, `build`, `start`, `lint`, `test`
+- `frontend/tsconfig.json` — strict mode enabled
+- `frontend/next.config.mjs` — minimal Next.js config (note: `.ts` extension not supported in Next.js 14.2.3)
+- `frontend/tailwind.config.ts` — content paths covering src/app and src/components
+- `frontend/postcss.config.mjs` — tailwindcss + autoprefixer
+- `frontend/.eslintrc.json` — extends `next/core-web-vitals` only (note: `next/typescript` does not exist in Next.js 14.2.3)
+- `frontend/vitest.config.ts` — jsdom environment, React plugin, setup file
+- `frontend/src/test/setup.ts` — imports `@testing-library/jest-dom`
+- `frontend/src/app/globals.css` — Tailwind directives
+- `frontend/src/app/layout.tsx` — root layout with `<html>` and `<body>`
+- `frontend/src/app/page.tsx` — renders "Muslin" heading
+- `frontend/src/lib/utils.ts` — preserved exactly from spec 02
+- `frontend/src/lib/utils.test.ts` — preserved exactly from spec 02
+
+**Deviations from spec:**
+
+1. Used `next.config.mjs` instead of `next.config.ts` — Next.js 14.2.3 does not support TypeScript config files (added in Next.js 15). The spec didn't specify which extension.
+2. Used `extends: ["next/core-web-vitals"]` only (not `next/typescript`) — `next/typescript` config doesn't exist in ESLint config for Next.js 14. Spec says this is the correct approach.
+3. All 5 tests in `utils.test.ts` pass (spec says "3 tests" but spec 02 actually has 5 tests). All pass.
+4. Scaffolded manually rather than via `create-next-app` due to sandboxed environment.
+
+**Verification:**
+
+- `pnpm test`: 5/5 tests pass (vitest run)
+- `pnpm lint`: exit 0, no warnings or errors
+- `pnpm build`: exit 0, successful static build
+
+**Open questions for Steph:**
+
+None — all acceptance criteria met.
