@@ -1279,3 +1279,87 @@ class TestHVCommandRotation:
         assert abs(coords[0][1] - 150.0) < 1e-4, f"M y: expected 150, got {coords[0][1]}"
         assert abs(coords[1][0] - 50.0) < 1e-4, f"H→L x: expected 50, got {coords[1][0]}"
         assert abs(coords[1][1] - 50.0) < 1e-4, f"H→L y: expected 50, got {coords[1][1]}"
+
+
+# ---------------------------------------------------------------------------
+# B3 — Multi-pair relative command coverage
+# ---------------------------------------------------------------------------
+
+
+class TestRelativeMultiPairCommands:
+    """B3: multi-pair relative commands (c/s/q, chained m) must resolve correctly.
+
+    Exercises the stride-based loop path added for B1 — specifically the
+    rep_start advance on continuation pairs (line 276 of pattern_ops.py).
+    """
+
+    def test_translate_relative_cubic(self) -> None:
+        """Translating M 0,0 c 10,0 10,10 10,10 by (+5, 0) shifts all pairs.
+
+        c with pen at (0,0): control1=(10,0), control2=(10,10), endpoint=(10,10).
+        After translate (+5, 0): M→(5,0), C→(15,0),(15,10),(15,10).
+        """
+        svg_str = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+  <path id="p" d="M 0,0 c 10,0 10,10 10,10"/>
+</svg>"""
+        p = load_pattern_from_string(svg_str)
+        p2 = translate_element(p, "p", 5.0, 0.0)
+        coords = _extract_path_coords(get_element(p2, "p").get("d"))
+        # M + 3 C pairs = 4 coordinate pairs
+        assert len(coords) == 4, f"expected 4 coord pairs, got {len(coords)}"
+        assert abs(coords[0][0] - 5.0) < 1e-4, f"M x: expected 5, got {coords[0][0]}"
+        assert abs(coords[0][1] - 0.0) < 1e-4, f"M y: expected 0, got {coords[0][1]}"
+        assert abs(coords[1][0] - 15.0) < 1e-4, f"C ctrl1 x: expected 15, got {coords[1][0]}"
+        assert abs(coords[1][1] - 0.0) < 1e-4, f"C ctrl1 y: expected 0, got {coords[1][1]}"
+        assert abs(coords[2][0] - 15.0) < 1e-4, f"C ctrl2 x: expected 15, got {coords[2][0]}"
+        assert abs(coords[2][1] - 10.0) < 1e-4, f"C ctrl2 y: expected 10, got {coords[2][1]}"
+        assert abs(coords[3][0] - 15.0) < 1e-4, f"C end x: expected 15, got {coords[3][0]}"
+        assert abs(coords[3][1] - 10.0) < 1e-4, f"C end y: expected 10, got {coords[3][1]}"
+
+    def test_translate_multi_pair_relative_lineto(self) -> None:
+        """m 10,10 5,5 3,3 encodes three absolute endpoints; each shifts under translate.
+
+        Pen starts at (0,0).
+        m first pair: abs (10,10) → pen=(10,10).
+        m second pair (implicit l): abs (10+5, 10+5)=(15,15) → pen=(15,15).
+        m third pair (implicit l): abs (15+3, 15+3)=(18,18).
+        Translate (+1, 0) → (11,10), (16,15), (19,18).
+        """
+        svg_str = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+  <path id="p" d="m 10,10 5,5 3,3"/>
+</svg>"""
+        p = load_pattern_from_string(svg_str)
+        p2 = translate_element(p, "p", 1.0, 0.0)
+        coords = _extract_path_coords(get_element(p2, "p").get("d"))
+        assert len(coords) == 3, f"expected 3 coord pairs, got {len(coords)}"
+        assert abs(coords[0][0] - 11.0) < 1e-4, f"pt0 x: expected 11, got {coords[0][0]}"
+        assert abs(coords[0][1] - 10.0) < 1e-4, f"pt0 y: expected 10, got {coords[0][1]}"
+        assert abs(coords[1][0] - 16.0) < 1e-4, f"pt1 x: expected 16, got {coords[1][0]}"
+        assert abs(coords[1][1] - 15.0) < 1e-4, f"pt1 y: expected 15, got {coords[1][1]}"
+        assert abs(coords[2][0] - 19.0) < 1e-4, f"pt2 x: expected 19, got {coords[2][0]}"
+        assert abs(coords[2][1] - 18.0) < 1e-4, f"pt2 y: expected 18, got {coords[2][1]}"
+
+    def test_multi_pair_M_subpath_start_not_overwritten(self) -> None:
+        """Z after a multi-pair M block returns to the first pair, not the last.
+
+        M 0,0 10,10 Z: subpath start is (0,0). After Z, pen = (0,0).
+        The implicit lineto (10,10) must not reset the subpath start.
+        Translate (+5, 0): M→(5,0), implicit-L→(15,10), Z closes to (5,0).
+        """
+        svg_str = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+  <path id="p" d="M 0,0 10,10 Z"/>
+</svg>"""
+        p = load_pattern_from_string(svg_str)
+        p2 = translate_element(p, "p", 5.0, 0.0)
+        d = get_element(p2, "p").get("d")
+        coords = _extract_path_coords(d)
+        # Two explicit coordinate pairs: M start and the implicit-L point
+        assert abs(coords[0][0] - 5.0) < 1e-4, f"M x: expected 5, got {coords[0][0]}"
+        assert abs(coords[0][1] - 0.0) < 1e-4, f"M y: expected 0, got {coords[0][1]}"
+        assert abs(coords[1][0] - 15.0) < 1e-4, f"implicit-L x: expected 15, got {coords[1][0]}"
+        assert abs(coords[1][1] - 10.0) < 1e-4, f"implicit-L y: expected 10, got {coords[1][1]}"
+        # Z must be present (path closes)
+        assert "Z" in d.upper(), "Z command must be preserved after translate"

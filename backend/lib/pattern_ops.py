@@ -283,7 +283,9 @@ def _transform_path_coords(
             # Advance pen to endpoint (last pair in the repetition)
             if pair_in_rep == stride - 1:
                 cur_x, cur_y = abs_x, abs_y
-                if upper == "M":
+                # Per SVG spec, only the first pair of an M block sets subpath start.
+                # Subsequent pairs are implicit lineto's and must not reset it.
+                if upper == "M" and i == 0:
                     start_x, start_y = cur_x, cur_y
 
             i += 2
