@@ -17,6 +17,7 @@ Acceptance criteria coverage:
 from __future__ import annotations
 
 import math
+import re
 from pathlib import Path
 
 import numpy as np
@@ -496,13 +497,29 @@ class TestSpreadAtLine:
         return p2, "slash-mid"
 
     def test_elements_on_one_side_translate(self) -> None:
-        """Elements clearly on one side of the slash line are translated."""
-        # We'll use a pattern where we can verify element positions change.
-        p, slash_id = self._make_pattern_with_slash()
-        p2 = spread_at_line(p, slash_id, 10.0, (1.0, 0.0))
-        # After spread, the pattern should have changed (elements moved)
-        assert p2 is not p
-        assert isinstance(p2, Pattern)
+        """Elements clearly on one side of the slash line are translated by the spread distance."""
+        svg_str = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200">
+  <path id="right-path" d="M 200,50 L 250,150"/>
+  <path id="left-path" d="M 20,50 L 80,150"/>
+  <line id="slash-v" x1="150" y1="0" x2="150" y2="200" stroke="red"/>
+</svg>"""
+        p = load_pattern_from_string(svg_str)
+        p2 = spread_at_line(p, "slash-v", 10.0, (1.0, 0.0))
+
+        # Right-side element (centroid at x=225) must shift by (10, 0)
+        r_orig = _extract_path_coords(get_element(p, "right-path").get("d"))
+        r_new = _extract_path_coords(get_element(p2, "right-path").get("d"))
+        for (ox, oy), (nx, ny) in zip(r_orig, r_new, strict=True):
+            assert abs(nx - (ox + 10.0)) < 1e-3, f"right-path x: expected {ox + 10}, got {nx}"
+            assert abs(ny - oy) < 1e-3
+
+        # Left-side element (centroid at x=50) must be unchanged
+        l_orig = _extract_path_coords(get_element(p, "left-path").get("d"))
+        l_new = _extract_path_coords(get_element(p2, "left-path").get("d"))
+        for (ox, oy), (nx, ny) in zip(l_orig, l_new, strict=True):
+            assert abs(nx - ox) < 1e-3, f"left-path x changed: {ox} → {nx}"
+            assert abs(ny - oy) < 1e-3
 
     def test_slash_id_not_in_pattern_raises_geometry_error(self) -> None:
         """spread_at_line raises GeometryError if slash_id is not in the pattern."""
@@ -599,9 +616,16 @@ class TestAddDart:
         pos = (100.0, 50.0)
         p2 = add_dart(p, pos, 30.0, 80.0, 90.0, "dart-pos")
         el = get_element(p2, "dart-pos")
-        # The tip coordinate should appear somewhere in the polygon/path
-        # (may be slightly off due to floating point formatting)
-        assert el is not None
+        pts_str = el.get("points", "")
+        nums = [float(v) for v in re.split(r"[,\s]+", pts_str.strip()) if v]
+        vertices = [(nums[i], nums[i + 1]) for i in range(0, len(nums) - 1, 2)]
+        # First vertex is the tip and must be exactly at `pos`
+        assert (
+            abs(vertices[0][0] - pos[0]) < 1e-4
+        ), f"Tip x: expected {pos[0]}, got {vertices[0][0]}"
+        assert (
+            abs(vertices[0][1] - pos[1]) < 1e-4
+        ), f"Tip y: expected {pos[1]}, got {vertices[0][1]}"
 
     def test_returns_pattern_instance(self) -> None:
         """add_dart returns a Pattern instance."""
@@ -759,6 +783,31 @@ class TestPurity:
         el3 = get_element(p3, "d1")
         assert el2.get("points") == el3.get("points")
 
+    def test_spread_at_line_is_pure(self) -> None:
+        """spread_at_line called twice with same args produces identical results."""
+        p = load_pattern(RECTANGLE_SVG)
+        p = slash_line(p, (150.0, 20.0), (150.0, 180.0), "slash-mid")
+        p2 = spread_at_line(p, "slash-mid", 10.0, (1.0, 0.0))
+        p3 = spread_at_line(p, "slash-mid", 10.0, (1.0, 0.0))
+        sl2 = get_element(p2, "slash-mid")
+        sl3 = get_element(p3, "slash-mid")
+        assert sl2.get("x2") == sl3.get("x2")
+        assert sl2.get("y2") == sl3.get("y2")
+
+    def test_true_seam_length_is_pure(self) -> None:
+        """true_seam_length called twice with same args produces identical results."""
+        svg_str = (
+            '<?xml version="1.0" encoding="utf-8"?>'
+            '<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">'
+            '<path id="seam-a" d="M 0,0 L 10,0"/>'
+            '<path id="seam-b" d="M 0,0 L 12,0"/>'
+            "</svg>"
+        )
+        p = load_pattern_from_string(svg_str)
+        p2 = true_seam_length(p, "seam-a", "seam-b")
+        p3 = true_seam_length(p, "seam-a", "seam-b")
+        assert get_element(p2, "seam-a").get("d") == get_element(p3, "seam-a").get("d")
+
 
 # ---------------------------------------------------------------------------
 # Error hierarchy
@@ -785,7 +834,7 @@ class TestPathCommandCoverage:
     """Tests that exercise H, V, and A SVG path commands in transforms."""
 
     def test_translate_path_with_H_command(self) -> None:
-        """translate_element correctly transforms H (horizontal lineto) commands."""
+        """translate_element shifts H command endpoints by (dx, dy)."""
         svg_str = """<?xml version="1.0" encoding="utf-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
   <path id="hpath" d="M 10,20 H 50 H 80"/>
@@ -793,13 +842,18 @@ class TestPathCommandCoverage:
         p = load_pattern_from_string(svg_str)
         p2 = translate_element(p, "hpath", 5.0, 3.0)
         new_d = get_element(p2, "hpath").get("d")
-        assert new_d is not None
-        # After translation the H values (x-only) should shift by dx=5
-        # M should shift to 15,23; H values 55 and 85
-        assert "15" in new_d or "15,23" in new_d
+        # H is promoted to L; absolute endpoints: (15,23), (55,23), (85,23)
+        coords = _extract_path_coords(new_d)
+        assert len(coords) == 3
+        assert abs(coords[0][0] - 15.0) < 1e-4
+        assert abs(coords[0][1] - 23.0) < 1e-4
+        assert abs(coords[1][0] - 55.0) < 1e-4
+        assert abs(coords[1][1] - 23.0) < 1e-4
+        assert abs(coords[2][0] - 85.0) < 1e-4
+        assert abs(coords[2][1] - 23.0) < 1e-4
 
     def test_translate_path_with_V_command(self) -> None:
-        """translate_element correctly transforms V (vertical lineto) commands."""
+        """translate_element shifts V command endpoints by (dx, dy)."""
         svg_str = """<?xml version="1.0" encoding="utf-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
   <path id="vpath" d="M 10,10 V 50 V 80"/>
@@ -807,11 +861,15 @@ class TestPathCommandCoverage:
         p = load_pattern_from_string(svg_str)
         p2 = translate_element(p, "vpath", 0.0, 10.0)
         new_d = get_element(p2, "vpath").get("d")
-        assert new_d is not None
-        # V values (y-only) should shift by dy=10
-        # V 50 → V 60; V 80 → V 90
-        assert "60" in new_d
-        assert "90" in new_d
+        # V is promoted to L; absolute endpoints: (10,20), (10,60), (10,90)
+        coords = _extract_path_coords(new_d)
+        assert len(coords) == 3
+        assert abs(coords[0][0] - 10.0) < 1e-4
+        assert abs(coords[0][1] - 20.0) < 1e-4
+        assert abs(coords[1][0] - 10.0) < 1e-4
+        assert abs(coords[1][1] - 60.0) < 1e-4
+        assert abs(coords[2][0] - 10.0) < 1e-4
+        assert abs(coords[2][1] - 90.0) < 1e-4
 
     def test_rotate_polygon_element(self) -> None:
         """rotate_element correctly handles <polygon> elements."""
@@ -1106,3 +1164,118 @@ class TestTrueSeamLengthPolyline:
         p2 = true_seam_length(p, "seam-a", "seam-b")
         coords = _extract_path_coords(get_element(p2, "seam-a").get("d"))
         assert abs(_arc_length(coords) - 12.0) < 1e-4
+
+
+# ---------------------------------------------------------------------------
+# B1 — Relative-command transform correctness
+# ---------------------------------------------------------------------------
+
+
+class TestRelativeCommandTransform:
+    """B1: relative SVG path commands must be resolved to absolute before transform."""
+
+    def test_translate_relative_path_absolute_endpoints(self) -> None:
+        """Translating a relative path leaves the relative offsets intact.
+
+        m 10,10 l 5,5 encodes absolute endpoints (10,10) and (15,15).
+        Translating by (3,0) must produce endpoints (13,10) and (18,15).
+        """
+        svg_str = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+  <path id="p" d="m 10,10 l 5,5"/>
+</svg>"""
+        p = load_pattern_from_string(svg_str)
+        p2 = translate_element(p, "p", 3.0, 0.0)
+        coords = _extract_path_coords(get_element(p2, "p").get("d"))
+        assert len(coords) == 2
+        assert abs(coords[0][0] - 13.0) < 1e-4, f"start x: expected 13, got {coords[0][0]}"
+        assert abs(coords[0][1] - 10.0) < 1e-4, f"start y: expected 10, got {coords[0][1]}"
+        assert abs(coords[1][0] - 18.0) < 1e-4, f"end x: expected 18, got {coords[1][0]}"
+        assert abs(coords[1][1] - 15.0) < 1e-4, f"end y: expected 15, got {coords[1][1]}"
+
+    def test_rotate_relative_path_around_non_origin_pivot(self) -> None:
+        """Rotating a relative path around a non-origin pivot transforms absolute endpoints.
+
+        m 10,10 l 5,5 → absolute endpoints (10,10) and (15,15).
+        Rotate 90° CW around (100,100):
+          (10,10)  → v=(-90,-90), R*v=(-90, 90), +pivot → (10,  190)
+          (15,15)  → v=(-85,-85), R*v=(-85, 85), +pivot → (15,  185)
+        """
+        svg_str = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+  <path id="p" d="m 10,10 l 5,5"/>
+</svg>"""
+        p = load_pattern_from_string(svg_str)
+        p2 = rotate_element(p, "p", 90.0, (100.0, 100.0))
+        coords = _extract_path_coords(get_element(p2, "p").get("d"))
+        assert len(coords) == 2
+        assert abs(coords[0][0] - 10.0) < 1e-4, f"pt0 x: expected 10, got {coords[0][0]}"
+        assert abs(coords[0][1] - 190.0) < 1e-4, f"pt0 y: expected 190, got {coords[0][1]}"
+        assert abs(coords[1][0] - 15.0) < 1e-4, f"pt1 x: expected 15, got {coords[1][0]}"
+        assert abs(coords[1][1] - 185.0) < 1e-4, f"pt1 y: expected 185, got {coords[1][1]}"
+
+
+# ---------------------------------------------------------------------------
+# B2 — H/V command rotation correctness
+# ---------------------------------------------------------------------------
+
+
+class TestHVCommandRotation:
+    """B2: H and V commands must be promoted to L under rotation."""
+
+    def test_rotate_H_command_90cw_around_origin(self) -> None:
+        """Rotating M 10,10 H 50 by 90° CW around origin transforms both endpoints.
+
+        Original absolute endpoints: (10,10) and (50,10).
+        90° CW in SVG (y-down), R = [[0,1],[-1,0]]:
+          (10,10) → (10, -10)
+          (50,10) → (10, -50)
+        """
+        svg_str = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+  <path id="p" d="M 10,10 H 50"/>
+</svg>"""
+        p = load_pattern_from_string(svg_str)
+        p2 = rotate_element(p, "p", 90.0, (0.0, 0.0))
+        coords = _extract_path_coords(get_element(p2, "p").get("d"))
+        assert len(coords) == 2
+        assert abs(coords[0][0] - 10.0) < 1e-4, f"M x: expected 10, got {coords[0][0]}"
+        assert abs(coords[0][1] - (-10.0)) < 1e-4, f"M y: expected -10, got {coords[0][1]}"
+        assert abs(coords[1][0] - 10.0) < 1e-4, f"H→L x: expected 10, got {coords[1][0]}"
+        assert abs(coords[1][1] - (-50.0)) < 1e-4, f"H→L y: expected -50, got {coords[1][1]}"
+
+    def test_rotate_V_command_90cw_around_origin(self) -> None:
+        """Rotating M 10,10 V 50 by 90° CW around origin transforms both endpoints.
+
+        Original absolute endpoints: (10,10) and (10,50).
+        90° CW: (10,10) → (10,-10); (10,50) → (50,-10).
+        """
+        svg_str = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+  <path id="p" d="M 10,10 V 50"/>
+</svg>"""
+        p = load_pattern_from_string(svg_str)
+        p2 = rotate_element(p, "p", 90.0, (0.0, 0.0))
+        coords = _extract_path_coords(get_element(p2, "p").get("d"))
+        assert len(coords) == 2
+        assert abs(coords[0][0] - 10.0) < 1e-4, f"M x: expected 10, got {coords[0][0]}"
+        assert abs(coords[0][1] - (-10.0)) < 1e-4, f"M y: expected -10, got {coords[0][1]}"
+        assert abs(coords[1][0] - 50.0) < 1e-4, f"V→L x: expected 50, got {coords[1][0]}"
+        assert abs(coords[1][1] - (-10.0)) < 1e-4, f"V→L y: expected -10, got {coords[1][1]}"
+
+    def test_rotate_H_command_non_origin_pivot(self) -> None:
+        """H command under rotation around a non-origin pivot produces correct L endpoint."""
+        svg_str = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+  <path id="p" d="M 50,50 H 150"/>
+</svg>"""
+        p = load_pattern_from_string(svg_str)
+        p2 = rotate_element(p, "p", 90.0, (100.0, 100.0))
+        coords = _extract_path_coords(get_element(p2, "p").get("d"))
+        # (50,50) around (100,100): v=(-50,-50), R*v=(-50,50), +pivot=(50,150)
+        # (150,50) around (100,100): v=(50,-50), R*v=(-50,-50), +pivot=(50,50)
+        assert len(coords) == 2
+        assert abs(coords[0][0] - 50.0) < 1e-4, f"M x: expected 50, got {coords[0][0]}"
+        assert abs(coords[0][1] - 150.0) < 1e-4, f"M y: expected 150, got {coords[0][1]}"
+        assert abs(coords[1][0] - 50.0) < 1e-4, f"H→L x: expected 50, got {coords[1][0]}"
+        assert abs(coords[1][1] - 50.0) < 1e-4, f"H→L y: expected 50, got {coords[1][1]}"
