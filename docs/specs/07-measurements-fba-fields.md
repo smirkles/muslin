@@ -65,31 +65,31 @@ Grandchildren (nested `<g>`) should also be handled recursively by the same mech
 
 ### FBA fields
 
-- [ ] Given a valid body with all 7 fields, when `POST /measurements` is called, then the response is `200 OK` with all 7 fields echoed back, a `size_label`, and a `measurement_id` UUID string.
-- [ ] Given `high_bust_cm: 59` (below minimum), when `POST /measurements` is called, then the response is `422` with an error referencing `high_bust_cm`.
-- [ ] Given `apex_to_apex_cm: 9` (below minimum of 10), when `POST /measurements` is called, then the response is `422` with an error referencing `apex_to_apex_cm`.
-- [ ] Given `apex_to_apex_cm: 31` (above maximum of 30), when `POST /measurements` is called, then the response is `422`.
-- [ ] Given a body missing `high_bust_cm`, when `POST /measurements` is called, then the response is `422`.
-- [ ] Given a body missing `apex_to_apex_cm`, when `POST /measurements` is called, then the response is `422`.
+- [x] Given a valid body with all 7 fields, when `POST /measurements` is called, then the response is `200 OK` with all 7 fields echoed back, a `size_label`, and a `measurement_id` UUID string.
+- [x] Given `high_bust_cm: 59` (below minimum), when `POST /measurements` is called, then the response is `422` with an error referencing `high_bust_cm`.
+- [x] Given `apex_to_apex_cm: 9` (below minimum of 10), when `POST /measurements` is called, then the response is `422` with an error referencing `apex_to_apex_cm`.
+- [x] Given `apex_to_apex_cm: 31` (above maximum of 30), when `POST /measurements` is called, then the response is `422`.
+- [x] Given a body missing `high_bust_cm`, when `POST /measurements` is called, then the response is `422`.
+- [x] Given a body missing `apex_to_apex_cm`, when `POST /measurements` is called, then the response is `422`.
 
 ### Session store
 
-- [ ] Given a successful `POST /measurements`, when `get_measurements(measurement_id)` is called with the returned UUID, then it returns a `MeasurementsResponse` with all 7 fields matching the request.
-- [ ] Given an unknown UUID, when `get_measurements` is called, then it raises `KeyError`.
-- [ ] Two successive `POST /measurements` calls with different bodies return different `measurement_id` values, and each UUID returns its own data.
+- [x] Given a successful `POST /measurements`, when `get_measurements(measurement_id)` is called with the returned UUID, then it returns a `MeasurementsResponse` with all 7 fields matching the request.
+- [x] Given an unknown UUID, when `get_measurements` is called, then it raises `KeyError`.
+- [x] Two successive `POST /measurements` calls with different bodies return different `measurement_id` values, and each UUID returns its own data.
 
 ### translate_element fix
 
-- [ ] Given a Pattern with a `<g id="piece">` containing two `<path>` children, when `translate_element(p, "piece", 10, 5)` is called, then each child path's coordinates are shifted by (10, 5). The original Pattern is unchanged.
-- [ ] Given a Pattern with a `<g>` containing a nested `<g>` containing a `<path>`, when `translate_element` is called on the outer `<g>`, then the innermost path's coordinates are also shifted.
-- [ ] Given a Pattern with a `<g id="piece">` and a separate `<path id="other">`, when `translate_element(p, "piece", 10, 5)` is called, then the `other` path's coordinates are unchanged.
-- [ ] Existing tests for `translate_element` on `<path>`, `<polygon>`, `<line>` still pass.
+- [x] Given a Pattern with a `<g id="piece">` containing two `<path>` children, when `translate_element(p, "piece", 10, 5)` is called, then each child path's coordinates are shifted by (10, 5). The original Pattern is unchanged.
+- [x] Given a Pattern with a `<g>` containing a nested `<g>` containing a `<path>`, when `translate_element` is called on the outer `<g>`, then the innermost path's coordinates are also shifted.
+- [x] Given a Pattern with a `<g id="piece">` and a separate `<path id="other">`, when `translate_element(p, "piece", 10, 5)` is called, then the `other` path's coordinates are unchanged.
+- [x] Existing tests for `translate_element` on `<path>`, `<polygon>`, `<line>` still pass.
 
 ### General
 
-- [ ] `uv run pytest tests/test_measurements.py` passes with all tests green (including regression tests for the existing 5-field happy path — the new fields are additive).
-- [ ] `uv run pytest tests/test_pattern_ops.py` passes with all tests green.
-- [ ] `uv run ruff check . && uv run black --check .` exits 0.
+- [x] `uv run pytest tests/test_measurements.py` passes with all tests green (including regression tests for the existing 5-field happy path — the new fields are additive).
+- [x] `uv run pytest tests/test_pattern_ops.py` passes with all tests green.
+- [x] `uv run ruff check . && uv run black --check .` exits 0.
 
 ## Out of scope
 
@@ -239,3 +239,11 @@ None. All acceptance criteria implemented as specified.
 - `size_label` is still derived from `bust_cm` only — do not change that logic.
 - For the `translate_element` fix, add at least one fixture SVG with a `<g>` containing multiple children to `backend/tests/fixtures/patterns/`. The existing `with_dart.svg` may already have this structure — check before creating a new file.
 - Run cleanup checklist after implementation (see `.claude/commands/cleanup.md`).
+
+## Cleanup notes
+
+- Checkboxes marked: 13 of 13
+- Stray files: none from this spec (`docs/specs/08-*.md`, `09-*.md`, and `docs/reviews/02-*.md` are untracked but belong to other work, not this branch)
+- TODOs: none found in changed files
+- Linter/test result: PASS — 208 tests, ruff + black exit 0
+- Post-review fix committed: `store_measurements` bug (UUID was stored as `""`) — fixed by generating UUID before constructing `MeasurementsResponse`; docstring nit corrected; test improved to assert data isolation across two distinct UUIDs
