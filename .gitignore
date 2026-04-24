@@ -40,8 +40,13 @@ Thumbs.db
 .claude/worktrees/
 
 # SMPL model files (license-restricted, not shareable)
+assets/smpl_models/**/*.pkl
+assets/smpl_models/**/*.npz
 assets/smpl_models/*.pkl
 assets/smpl_models/*.npz
+
+# Stray agent worktree dirs
+.claire/
 
 # User-uploaded images (demo only)
 assets/muslin-photos/user-uploads/
