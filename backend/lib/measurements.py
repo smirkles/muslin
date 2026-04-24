@@ -3,8 +3,6 @@
 No FastAPI imports — this module must be unit-testable in isolation.
 """
 
-import uuid
-
 from pydantic import BaseModel, Field
 
 
@@ -30,11 +28,9 @@ class MeasurementsResponse(Measurements):
 _store: dict[str, MeasurementsResponse] = {}
 
 
-def store_measurements(m: MeasurementsResponse) -> str:
-    """Store measurements in the session store and return their UUID key."""
-    key = str(uuid.uuid4())
-    _store[key] = m
-    return key
+def store_measurements(m: MeasurementsResponse) -> None:
+    """Store measurements in the session store keyed by m.measurement_id."""
+    _store[m.measurement_id] = m
 
 
 def get_measurements(measurement_id: str) -> MeasurementsResponse:

@@ -495,10 +495,18 @@ class TestMeasurementId:
         assert isinstance(mid, str)
         assert len(mid) == 36  # standard UUID format: 8-4-4-4-12
 
-    def test_two_posts_return_distinct_ids(self) -> None:
-        r1 = client.post("/measurements", json=self._valid_body())
-        r2 = client.post("/measurements", json=self._valid_body())
-        assert r1.json()["measurement_id"] != r2.json()["measurement_id"]
+    def test_two_posts_have_distinct_ids_and_isolated_data(self) -> None:
+        from lib.measurements import get_measurements
+
+        body1 = self._valid_body()
+        body2 = {**self._valid_body(), "bust_cm": 88.0, "high_bust_cm": 80.0}
+        r1 = client.post("/measurements", json=body1)
+        r2 = client.post("/measurements", json=body2)
+        mid1, mid2 = r1.json()["measurement_id"], r2.json()["measurement_id"]
+        assert mid1 != mid2
+        # Each UUID retrieves its own data
+        assert get_measurements(mid1).bust_cm == 96.0
+        assert get_measurements(mid2).bust_cm == 88.0
 
     def test_store_roundtrip_via_get_measurements(self) -> None:
         from lib.measurements import get_measurements
@@ -509,6 +517,8 @@ class TestMeasurementId:
         assert stored.bust_cm == 96.0
         assert stored.high_bust_cm == 85.0
         assert stored.apex_to_apex_cm == 18.0
+        # The stored object's measurement_id must match the retrieval key
+        assert stored.measurement_id == mid
 
     def test_get_measurements_unknown_id_raises_key_error(self) -> None:
         from lib.measurements import get_measurements

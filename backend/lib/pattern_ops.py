@@ -20,7 +20,7 @@ Supported element types
 <path>    — coordinates in the ``d`` attribute (M/L/Z/C/Q/S commands)
 <polygon> — coordinates in the ``points`` attribute
 <line>    — coordinates in x1, y1, x2, y2 attributes
-<g>       — group container; translate/rotate recurse into all descendant elements
+<g>       — group container; translate recurses into all descendant elements
 <text>    — indexed by id; translate moves x/y attributes
 
 Curve approximation
