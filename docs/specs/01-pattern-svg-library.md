@@ -123,7 +123,7 @@ Three fixture SVGs created in `backend/tests/fixtures/patterns/`: `triangle.svg`
 
 ### Open questions for Steph
 
-- Should `spread_at_line` handle elements that straddle the slash line differently? Currently they move with the right side (conservative). For real FBA use cases, straddling elements might need to be split.
+- Should `spread_at_line` handle elements that straddle the slash line differently? Currently they move with the right side (conservative). For real FBA use cases, straddling elements might need to be split. **Deferred: revisit once spread operations are visible in the UI and the edge case can be observed directly.**
 - `true_seam_length` uses start→end Euclidean distance. For curved seams (future work), this will be wrong — should we add a warning/flag for curved paths?
 - `translate_element` on `<g>` is currently a no-op. Should it recurse into children instead?
 
