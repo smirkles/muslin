@@ -20,7 +20,7 @@ Supported element types
 <path>    — coordinates in the ``d`` attribute (M/L/Z/C/Q/S commands)
 <polygon> — coordinates in the ``points`` attribute
 <line>    — coordinates in x1, y1, x2, y2 attributes
-<g>       — group container (indexed by id, not transformed directly)
+<g>       — group container; translate recurses into all descendant elements
 <text>    — indexed by id; translate moves x/y attributes
 
 Curve approximation
@@ -385,8 +385,11 @@ def _translate_element(el: etree._Element, dx: float, dy: float) -> None:
         el.set("x", _format_coord(x + dx))
         el.set("y", _format_coord(y + dy))
 
-    # <g> elements are not directly transformed — their children are.
-    # Groups are containers; callers should translate individual children.
+    elif tag in _G_TAGS:
+        # Recurse into all direct children; this handles nested <g> automatically
+        # because each child <g> will again hit this branch.
+        for child in el:
+            _translate_element(child, dx, dy)
 
 
 def _rotate_element(

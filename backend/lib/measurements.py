@@ -10,6 +10,8 @@ class Measurements(BaseModel):
     """Validated body measurements in centimetres."""
 
     bust_cm: float = Field(..., ge=60, le=200)
+    high_bust_cm: float = Field(..., ge=60, le=200)
+    apex_to_apex_cm: float = Field(..., ge=10, le=30)
     waist_cm: float = Field(..., ge=40, le=200)
     hip_cm: float = Field(..., ge=60, le=200)
     height_cm: float = Field(..., ge=120, le=220)
@@ -17,9 +19,23 @@ class Measurements(BaseModel):
 
 
 class MeasurementsResponse(Measurements):
-    """Validated measurements plus a derived standard size label."""
+    """Validated measurements plus a derived size label and a session store ID."""
 
+    measurement_id: str
     size_label: str
+
+
+_store: dict[str, MeasurementsResponse] = {}
+
+
+def store_measurements(m: MeasurementsResponse) -> None:
+    """Store measurements in the session store keyed by m.measurement_id."""
+    _store[m.measurement_id] = m
+
+
+def get_measurements(measurement_id: str) -> MeasurementsResponse:
+    """Retrieve stored measurements by UUID. Raises KeyError if not found."""
+    return _store[measurement_id]
 
 
 def derive_size_label(bust_cm: float) -> str:

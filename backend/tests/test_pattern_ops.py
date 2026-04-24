@@ -48,6 +48,7 @@ FIXTURES = Path(__file__).parent / "fixtures" / "patterns"
 TRIANGLE_SVG = FIXTURES / "triangle.svg"
 RECTANGLE_SVG = FIXTURES / "rectangle.svg"
 WITH_DART_SVG = FIXTURES / "with_dart.svg"
+GROUPED_PIECE_SVG = FIXTURES / "grouped_piece.svg"
 
 SVG_NS = "http://www.w3.org/2000/svg"
 
@@ -989,3 +990,56 @@ class TestInternalHelperEdgeCases:
         end = np.array(coords[-1])
         new_len = float(np.linalg.norm(end - start))
         assert abs(new_len - 20.0) < 1e-4
+
+
+# ---------------------------------------------------------------------------
+# Spec 07 — translate_element on <g> group (AC fix)
+# ---------------------------------------------------------------------------
+
+
+class TestTranslateGroup:
+    """Spec 07: translate_element on a <g> must recurse into all children."""
+
+    def test_translate_group_shifts_both_path_children(self) -> None:
+        """Translating a <g> shifts all child <path> coordinates."""
+        p = load_pattern(GROUPED_PIECE_SVG)
+        p2 = translate_element(p, "bodice-front", 10, 5)
+        d = get_element(p2, "front-outline").get("d")
+        # Original M 10,10 → M 20,15
+        assert "20" in d
+        assert "15" in d
+
+    def test_translate_group_shifts_second_path_child(self) -> None:
+        """Both child paths in the group are translated."""
+        p = load_pattern(GROUPED_PIECE_SVG)
+        p2 = translate_element(p, "bodice-front", 10, 5)
+        d = get_element(p2, "front-seam").get("d")
+        # Original M 10,10 → M 20,15
+        assert "20" in d
+        assert "15" in d
+
+    def test_translate_group_leaves_sibling_unchanged(self) -> None:
+        """Elements outside the translated group are not affected."""
+        p = load_pattern(GROUPED_PIECE_SVG)
+        p2 = translate_element(p, "bodice-front", 10, 5)
+        d = get_element(p2, "sibling-path").get("d")
+        # sibling-path at M 150,300 — should be unchanged
+        assert "150" in d
+        assert "300" in d
+
+    def test_translate_group_does_not_mutate_original(self) -> None:
+        """Original pattern is unmodified after group translation."""
+        p = load_pattern(GROUPED_PIECE_SVG)
+        _ = translate_element(p, "bodice-front", 10, 5)
+        d_orig = get_element(p, "front-outline").get("d")
+        # Original starts at M 10,10
+        assert "M 10" in d_orig
+
+    def test_translate_nested_group_recurses_to_innermost_path(self) -> None:
+        """Translating outer-g reaches nested-path inside inner-g."""
+        p = load_pattern(GROUPED_PIECE_SVG)
+        p2 = translate_element(p, "outer-g", 20, 30)
+        d = get_element(p2, "nested-path").get("d")
+        # Original M 200,10 → M 220,40
+        assert "220" in d
+        assert "40" in d

@@ -114,6 +114,8 @@ class TestMeasurementsModel:
     def _valid_payload(self) -> dict:
         return {
             "bust_cm": 96.0,
+            "high_bust_cm": 85.0,
+            "apex_to_apex_cm": 18.0,
             "waist_cm": 78.0,
             "hip_cm": 104.0,
             "height_cm": 168.0,
@@ -257,6 +259,8 @@ class TestMeasurementsRoute:
     def _valid_body(self) -> dict:
         return {
             "bust_cm": 96.0,
+            "high_bust_cm": 85.0,
+            "apex_to_apex_cm": 18.0,
             "waist_cm": 78.0,
             "hip_cm": 104.0,
             "height_cm": 168.0,
@@ -378,3 +382,146 @@ class TestMeasurementsRoute:
     def test_empty_body_returns_422(self) -> None:
         response = client.post("/measurements", json={})
         assert response.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Spec 07 — FBA fields (high_bust_cm, apex_to_apex_cm) and measurement_id
+# ---------------------------------------------------------------------------
+
+
+class TestFBAFields:
+    """Tests for the two new FBA measurement fields added in spec 07."""
+
+    def _valid_body(self) -> dict:
+        return {
+            "bust_cm": 96.0,
+            "high_bust_cm": 85.0,
+            "apex_to_apex_cm": 18.0,
+            "waist_cm": 78.0,
+            "hip_cm": 104.0,
+            "height_cm": 168.0,
+            "back_length_cm": 39.5,
+        }
+
+    # high_bust_cm validation
+    def test_high_bust_cm_missing_returns_422(self) -> None:
+        body = self._valid_body()
+        del body["high_bust_cm"]
+        assert client.post("/measurements", json=body).status_code == 422
+
+    def test_high_bust_cm_at_min_is_valid(self) -> None:
+        body = self._valid_body()
+        body["high_bust_cm"] = 60.0
+        assert client.post("/measurements", json=body).status_code == 200
+
+    def test_high_bust_cm_at_max_is_valid(self) -> None:
+        body = self._valid_body()
+        body["high_bust_cm"] = 200.0
+        assert client.post("/measurements", json=body).status_code == 200
+
+    def test_high_bust_cm_below_min_returns_422(self) -> None:
+        body = self._valid_body()
+        body["high_bust_cm"] = 59.9
+        resp = client.post("/measurements", json=body)
+        assert resp.status_code == 422
+        fields = [err["loc"][-1] for err in resp.json()["detail"]]
+        assert "high_bust_cm" in fields
+
+    def test_high_bust_cm_above_max_returns_422(self) -> None:
+        body = self._valid_body()
+        body["high_bust_cm"] = 200.1
+        assert client.post("/measurements", json=body).status_code == 422
+
+    # apex_to_apex_cm validation
+    def test_apex_to_apex_cm_missing_returns_422(self) -> None:
+        body = self._valid_body()
+        del body["apex_to_apex_cm"]
+        assert client.post("/measurements", json=body).status_code == 422
+
+    def test_apex_to_apex_cm_at_min_is_valid(self) -> None:
+        body = self._valid_body()
+        body["apex_to_apex_cm"] = 10.0
+        assert client.post("/measurements", json=body).status_code == 200
+
+    def test_apex_to_apex_cm_at_max_is_valid(self) -> None:
+        body = self._valid_body()
+        body["apex_to_apex_cm"] = 30.0
+        assert client.post("/measurements", json=body).status_code == 200
+
+    def test_apex_to_apex_cm_below_min_returns_422(self) -> None:
+        body = self._valid_body()
+        body["apex_to_apex_cm"] = 9.9
+        resp = client.post("/measurements", json=body)
+        assert resp.status_code == 422
+        fields = [err["loc"][-1] for err in resp.json()["detail"]]
+        assert "apex_to_apex_cm" in fields
+
+    def test_apex_to_apex_cm_above_max_returns_422(self) -> None:
+        body = self._valid_body()
+        body["apex_to_apex_cm"] = 30.1
+        assert client.post("/measurements", json=body).status_code == 422
+
+    # Response shape
+    def test_valid_body_echoes_fba_fields(self) -> None:
+        resp = client.post("/measurements", json=self._valid_body())
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["high_bust_cm"] == 85.0
+        assert data["apex_to_apex_cm"] == 18.0
+
+
+class TestMeasurementId:
+    """Tests for measurement_id session store (spec 07)."""
+
+    def _valid_body(self) -> dict:
+        return {
+            "bust_cm": 96.0,
+            "high_bust_cm": 85.0,
+            "apex_to_apex_cm": 18.0,
+            "waist_cm": 78.0,
+            "hip_cm": 104.0,
+            "height_cm": 168.0,
+            "back_length_cm": 39.5,
+        }
+
+    def test_response_includes_measurement_id(self) -> None:
+        resp = client.post("/measurements", json=self._valid_body())
+        assert resp.status_code == 200
+        assert "measurement_id" in resp.json()
+
+    def test_measurement_id_is_uuid_string(self) -> None:
+        resp = client.post("/measurements", json=self._valid_body())
+        mid = resp.json()["measurement_id"]
+        assert isinstance(mid, str)
+        assert len(mid) == 36  # standard UUID format: 8-4-4-4-12
+
+    def test_two_posts_have_distinct_ids_and_isolated_data(self) -> None:
+        from lib.measurements import get_measurements
+
+        body1 = self._valid_body()
+        body2 = {**self._valid_body(), "bust_cm": 88.0, "high_bust_cm": 80.0}
+        r1 = client.post("/measurements", json=body1)
+        r2 = client.post("/measurements", json=body2)
+        mid1, mid2 = r1.json()["measurement_id"], r2.json()["measurement_id"]
+        assert mid1 != mid2
+        # Each UUID retrieves its own data
+        assert get_measurements(mid1).bust_cm == 96.0
+        assert get_measurements(mid2).bust_cm == 88.0
+
+    def test_store_roundtrip_via_get_measurements(self) -> None:
+        from lib.measurements import get_measurements
+
+        resp = client.post("/measurements", json=self._valid_body())
+        mid = resp.json()["measurement_id"]
+        stored = get_measurements(mid)
+        assert stored.bust_cm == 96.0
+        assert stored.high_bust_cm == 85.0
+        assert stored.apex_to_apex_cm == 18.0
+        # The stored object's measurement_id must match the retrieval key
+        assert stored.measurement_id == mid
+
+    def test_get_measurements_unknown_id_raises_key_error(self) -> None:
+        from lib.measurements import get_measurements
+
+        with pytest.raises(KeyError):
+            get_measurements("00000000-0000-0000-0000-000000000000")
