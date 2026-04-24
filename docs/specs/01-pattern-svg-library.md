@@ -123,14 +123,24 @@ Three fixture SVGs created in `backend/tests/fixtures/patterns/`: `triangle.svg`
 
 ### Open questions for Steph
 
-- Should `spread_at_line` handle elements that straddle the slash line differently? Currently they move with the right side (conservative). For real FBA use cases, straddling elements might need to be split.
+- Should `spread_at_line` handle elements that straddle the slash line differently? Currently they move with the right side (conservative). For real FBA use cases, straddling elements might need to be split. **Deferred: revisit once spread operations are visible in the UI and the edge case can be observed directly.**
 - `true_seam_length` uses start→end Euclidean distance. For curved seams (future work), this will be wrong — should we add a warning/flag for curved paths?
 - `translate_element` on `<g>` is currently a no-op. Should it recurse into children instead?
 
-### Cleanup notes
+### Cleanup notes (initial — 2026-04-23)
 
 - All 11 spec acceptance criteria are checked off above.
 - No TODOs left in source code (future-work items are in docstrings, not inline TODOs).
 - Ruff + black both pass clean.
 - All 99 backend tests pass (83 new + 16 pre-existing).
 - No new ADRs needed — all decisions follow existing patterns or are self-evident V1 simplifications documented in code.
+
+### Cleanup notes (post-review fix — 2026-04-24)
+
+- Checkboxes marked: 11 of 11 (all passing).
+- Stray files: none introduced by this fix. Untracked `docs/reviews/` files are review artifacts (expected). `docs/specs/09-*.md` is a new spec, not a stray.
+- TODOs / future-work flags found: 3 (bezier distortion under rotation at line 31 and 203; `spread_at_line` straddling-element caveat at line 565). All are docstring annotations, not inline TODOs — no action needed.
+- Linter/test result: PASS — 95 pattern_ops tests, 215 backend tests total; `ruff check` clean; `black --check` clean.
+- No `.env`, secrets, or credential files staged or untracked.
+- `pyproject.toml` and `uv.lock` unchanged — no dependency changes.
+- Items needing Steph's attention: none introduced by this fix. The three open questions from the initial cleanup notes (straddling elements, curved seams, `<g>` translation) remain open and unchanged.
