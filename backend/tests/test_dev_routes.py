@@ -1,6 +1,5 @@
 """Integration tests for POST /dev/reverse-string using FastAPI TestClient."""
 
-import pytest
 from fastapi.testclient import TestClient
 
 from main import app
