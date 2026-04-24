@@ -12,6 +12,12 @@ export interface MeasurementsResponse {
   size_label: string;
 }
 
+export interface PhotoRecord {
+  photo_id: string;
+  view_label: string;
+  filename: string;
+}
+
 export class ApiValidationError extends Error {
   detail: FastApiValidationError[];
 
@@ -20,6 +26,32 @@ export class ApiValidationError extends Error {
     this.detail = detail;
     this.name = "ApiValidationError";
   }
+}
+
+/** Post photos to the backend and return the list of PhotoRecord objects. */
+export async function postPhotos(
+  measurementId: string,
+  files: File[],
+  viewLabels: string[],
+): Promise<PhotoRecord[]> {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const form = new FormData();
+  form.append("measurement_id", measurementId);
+  for (const file of files) {
+    form.append("photos", file);
+  }
+  for (const label of viewLabels) {
+    form.append("view_labels", label);
+  }
+  const res = await fetch(`${apiUrl}/photos/upload`, {
+    method: "POST",
+    body: form,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ detail: `API error ${res.status}` }));
+    throw new Error(body.detail ?? `API error ${res.status}`);
+  }
+  return res.json();
 }
 
 /** Post measurements to the backend and return the typed response. */
