@@ -114,6 +114,8 @@ class TestMeasurementsModel:
     def _valid_payload(self) -> dict:
         return {
             "bust_cm": 96.0,
+            "high_bust_cm": 85.0,
+            "apex_to_apex_cm": 18.0,
             "waist_cm": 78.0,
             "hip_cm": 104.0,
             "height_cm": 168.0,
@@ -257,6 +259,8 @@ class TestMeasurementsRoute:
     def _valid_body(self) -> dict:
         return {
             "bust_cm": 96.0,
+            "high_bust_cm": 85.0,
+            "apex_to_apex_cm": 18.0,
             "waist_cm": 78.0,
             "hip_cm": 104.0,
             "height_cm": 168.0,
