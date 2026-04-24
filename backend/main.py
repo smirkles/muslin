@@ -26,9 +26,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# DEV-ONLY: Register the dev router. In a production deployment this router
-# should be conditionally excluded (e.g. behind an ENV flag). It is included
-# unconditionally here to keep the scaffold simple during early development.
-app.include_router(dev_router)
+# Register the dev router only when APP_ENV is not "production".
+# include_in_schema=False keeps /dev/* out of /docs and /openapi.json in all envs.
+if os.environ.get("APP_ENV") != "production":
+    app.include_router(dev_router, include_in_schema=False)
 app.include_router(measurements_router)
 app.include_router(patterns_router)
