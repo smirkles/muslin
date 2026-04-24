@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { PhotoUpload } from "../PhotoUpload";
 
 // ---------------------------------------------------------------------------
 // Mock URL.createObjectURL (jsdom does not implement it)
 // ---------------------------------------------------------------------------
-globalThis.URL.createObjectURL = vi.fn((blob: Blob) => `blob:mock/${Math.random()}`);
+globalThis.URL.createObjectURL = vi.fn((_blob: Blob) => `blob:mock/${Math.random()}`);
 globalThis.URL.revokeObjectURL = vi.fn();
 
 // ---------------------------------------------------------------------------
@@ -84,10 +84,10 @@ describe("PhotoUpload", () => {
   describe("thumbnail rendering", () => {
     it("shows a thumbnail immediately when a JPEG file is dropped", async () => {
       render(<PhotoUpload measurementId={MEASUREMENT_ID} onSuccess={vi.fn()} />);
-      const dropzone = screen.getByTestId("dropzone");
+      const input = screen.getByTestId("file-input");
 
       const file = makeJpegFile("front.jpg");
-      await userEvent.upload(dropzone, [file]);
+      await userEvent.upload(input, [file]);
 
       const imgs = screen.getAllByRole("img");
       expect(imgs.length).toBeGreaterThanOrEqual(1);
@@ -98,10 +98,10 @@ describe("PhotoUpload", () => {
 
     it("shows a thumbnail for a PNG file", async () => {
       render(<PhotoUpload measurementId={MEASUREMENT_ID} onSuccess={vi.fn()} />);
-      const dropzone = screen.getByTestId("dropzone");
+      const input = screen.getByTestId("file-input");
 
       const file = makePngFile("back.png");
-      await userEvent.upload(dropzone, [file]);
+      await userEvent.upload(input, [file]);
 
       const imgs = screen.getAllByRole("img");
       expect(imgs.length).toBeGreaterThanOrEqual(1);
@@ -114,20 +114,20 @@ describe("PhotoUpload", () => {
   describe("client-side size validation", () => {
     it("shows an inline error when a file > 10 MB is dropped", async () => {
       render(<PhotoUpload measurementId={MEASUREMENT_ID} onSuccess={vi.fn()} />);
-      const dropzone = screen.getByTestId("dropzone");
+      const input = screen.getByTestId("file-input");
 
       const bigFile = makeLargeFile("big.jpg");
-      await userEvent.upload(dropzone, [bigFile]);
+      await userEvent.upload(input, [bigFile]);
 
-      expect(screen.getByText(/10 mb/i)).toBeTruthy();
+      expect(screen.getAllByText(/10 mb/i).length).toBeGreaterThanOrEqual(1);
     });
 
     it("does not include an oversized file in the submission list", async () => {
       render(<PhotoUpload measurementId={MEASUREMENT_ID} onSuccess={vi.fn()} />);
-      const dropzone = screen.getByTestId("dropzone");
+      const input = screen.getByTestId("file-input");
 
       const bigFile = makeLargeFile("big.jpg");
-      await userEvent.upload(dropzone, [bigFile]);
+      await userEvent.upload(input, [bigFile]);
 
       // Upload button should still be disabled since no valid files
       expect(screen.getByRole("button", { name: /upload/i })).toBeDisabled();
@@ -140,7 +140,7 @@ describe("PhotoUpload", () => {
   describe("more than 3 files", () => {
     it("shows an inline error when more than 3 files are dropped", async () => {
       render(<PhotoUpload measurementId={MEASUREMENT_ID} onSuccess={vi.fn()} />);
-      const dropzone = screen.getByTestId("dropzone");
+      const input = screen.getByTestId("file-input");
 
       const files = [
         makeJpegFile("a.jpg"),
@@ -148,14 +148,14 @@ describe("PhotoUpload", () => {
         makeJpegFile("c.jpg"),
         makeJpegFile("d.jpg"),
       ];
-      await userEvent.upload(dropzone, files);
+      await userEvent.upload(input, files);
 
-      expect(screen.getByText(/3/)).toBeTruthy();
+      expect(screen.getAllByText(/maximum 3/i).length).toBeGreaterThanOrEqual(1);
     });
 
     it("keeps only the first 3 files when more than 3 are dropped", async () => {
       render(<PhotoUpload measurementId={MEASUREMENT_ID} onSuccess={vi.fn()} />);
-      const dropzone = screen.getByTestId("dropzone");
+      const input = screen.getByTestId("file-input");
 
       const files = [
         makeJpegFile("a.jpg"),
@@ -163,7 +163,7 @@ describe("PhotoUpload", () => {
         makeJpegFile("c.jpg"),
         makeJpegFile("d.jpg"),
       ];
-      await userEvent.upload(dropzone, files);
+      await userEvent.upload(input, files);
 
       // Should show only 3 thumbnails
       const imgs = screen.getAllByRole("img");
@@ -177,10 +177,10 @@ describe("PhotoUpload", () => {
   describe("view label selection", () => {
     it("upload button is disabled until all files have a view label", async () => {
       render(<PhotoUpload measurementId={MEASUREMENT_ID} onSuccess={vi.fn()} />);
-      const dropzone = screen.getByTestId("dropzone");
+      const input = screen.getByTestId("file-input");
 
       const file = makeJpegFile("front.jpg");
-      await userEvent.upload(dropzone, [file]);
+      await userEvent.upload(input, [file]);
 
       // No label selected yet → button still disabled
       expect(screen.getByRole("button", { name: /upload/i })).toBeDisabled();
@@ -189,10 +189,10 @@ describe("PhotoUpload", () => {
     it("upload button becomes enabled when file has a label", async () => {
       const user = userEvent.setup();
       render(<PhotoUpload measurementId={MEASUREMENT_ID} onSuccess={vi.fn()} />);
-      const dropzone = screen.getByTestId("dropzone");
+      const input = screen.getByTestId("file-input");
 
       const file = makeJpegFile("front.jpg");
-      await userEvent.upload(dropzone, [file]);
+      await userEvent.upload(input, [file]);
 
       // Select a view label
       const select = screen.getByRole("combobox");
@@ -215,9 +215,9 @@ describe("PhotoUpload", () => {
       mockPostPhotos.mockResolvedValueOnce(mockRecords);
 
       render(<PhotoUpload measurementId={MEASUREMENT_ID} onSuccess={onSuccess} />);
-      const dropzone = screen.getByTestId("dropzone");
+      const input = screen.getByTestId("file-input");
 
-      await userEvent.upload(dropzone, [makeJpegFile("front.jpg")]);
+      await userEvent.upload(input, [makeJpegFile("front.jpg")]);
       await user.selectOptions(screen.getByRole("combobox"), "front");
       await user.click(screen.getByRole("button", { name: /upload/i }));
 
@@ -236,9 +236,9 @@ describe("PhotoUpload", () => {
       mockPostPhotos.mockRejectedValueOnce(new Error("API error 413"));
 
       render(<PhotoUpload measurementId={MEASUREMENT_ID} onSuccess={vi.fn()} />);
-      const dropzone = screen.getByTestId("dropzone");
+      const input = screen.getByTestId("file-input");
 
-      await userEvent.upload(dropzone, [makeJpegFile("front.jpg")]);
+      await userEvent.upload(input, [makeJpegFile("front.jpg")]);
       await user.selectOptions(screen.getByRole("combobox"), "front");
       await user.click(screen.getByRole("button", { name: /upload/i }));
 
@@ -252,9 +252,9 @@ describe("PhotoUpload", () => {
       mockPostPhotos.mockRejectedValueOnce(new Error("API error 500"));
 
       render(<PhotoUpload measurementId={MEASUREMENT_ID} onSuccess={vi.fn()} />);
-      const dropzone = screen.getByTestId("dropzone");
+      const input = screen.getByTestId("file-input");
 
-      await userEvent.upload(dropzone, [makeJpegFile("front.jpg")]);
+      await userEvent.upload(input, [makeJpegFile("front.jpg")]);
       await user.selectOptions(screen.getByRole("combobox"), "front");
       await user.click(screen.getByRole("button", { name: /upload/i }));
 

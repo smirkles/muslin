@@ -3,19 +3,15 @@
 All tests in this file work without any FastAPI imports (import hygiene requirement).
 """
 
-import importlib
-import importlib.util
-import sys
-import tempfile
 import uuid
 from pathlib import Path
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers: minimal valid JPEG / PNG bytes
 # ---------------------------------------------------------------------------
+
 
 def make_jpeg_bytes(size_bytes: int = 100) -> bytes:
     """Return JPEG-magic-byte header padded to size_bytes."""
@@ -54,9 +50,9 @@ class TestImportHygiene:
         """lib/photos/*.py must not import fastapi."""
         for path in self._source_files():
             text = path.read_text()
-            assert "fastapi" not in text, (
-                f"{path.name} contains 'fastapi' — lib modules must be framework-free"
-            )
+            assert (
+                "fastapi" not in text
+            ), f"{path.name} contains 'fastapi' — lib modules must be framework-free"
 
 
 # ---------------------------------------------------------------------------
@@ -240,7 +236,9 @@ class TestStoreAndResolve:
 
         measurement_id = str(uuid.uuid4())
         photo_id = str(uuid.uuid4())
-        result = store_photo(measurement_id, photo_id, make_jpeg_bytes(100), ".jpg", base_dir=tmp_path)
+        result = store_photo(
+            measurement_id, photo_id, make_jpeg_bytes(100), ".jpg", base_dir=tmp_path
+        )
 
         assert isinstance(result, Path)
         assert result.exists()

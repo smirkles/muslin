@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes.dev import router as dev_router
 from routes.measurements import router as measurements_router
 from routes.patterns import router as patterns_router
+from routes.photos import router as photos_router
 
 load_dotenv(".env.local")
 
@@ -32,3 +33,4 @@ if os.environ.get("APP_ENV") != "production":
     app.include_router(dev_router, include_in_schema=False)
 app.include_router(measurements_router)
 app.include_router(patterns_router)
+app.include_router(photos_router)

@@ -46,6 +46,9 @@ assets/smpl_models/*.npz
 # User-uploaded images (demo only)
 assets/muslin-photos/user-uploads/
 
+# Ephemeral photo uploads (never permanent, temp storage for demo)
+backend/.tmp/
+
 # Eval results (can regenerate)
 evals/results/*.json
 

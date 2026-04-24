@@ -4,7 +4,6 @@ import io
 import uuid
 from pathlib import Path
 
-import pytest
 from fastapi.testclient import TestClient
 
 from lib.measurements import MeasurementsResponse, store_measurements
@@ -19,6 +18,7 @@ MB = 1024 * 1024
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def make_jpeg_bytes(size_bytes: int = 500) -> bytes:
     """Return JPEG-magic header padded to size_bytes."""
     return bytes([0xFF, 0xD8, 0xFF, 0xE0]) + b"\x00" * max(0, size_bytes - 4)
@@ -26,7 +26,9 @@ def make_jpeg_bytes(size_bytes: int = 500) -> bytes:
 
 def make_png_bytes(size_bytes: int = 500) -> bytes:
     """Return PNG-magic header padded to size_bytes."""
-    return bytes([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) + b"\x00" * max(0, size_bytes - 8)
+    return bytes([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) + b"\x00" * max(
+        0, size_bytes - 8
+    )
 
 
 def make_gif_bytes(size_bytes: int = 500) -> bytes:
@@ -60,10 +62,7 @@ def make_upload_files(
 
     file_specs: list of (filename, bytes)
     """
-    files = [
-        ("photos", (fname, io.BytesIO(data), "image/jpeg"))
-        for fname, data in file_specs
-    ]
+    files = [("photos", (fname, io.BytesIO(data), "image/jpeg")) for fname, data in file_specs]
     data = {
         "measurement_id": measurement_id,
         "view_labels": view_labels,
@@ -439,10 +438,6 @@ class TestAllOrNothingValidation:
 
     def test_one_valid_one_invalid_writes_no_files(self, tmp_path: Path) -> None:
         """If any file is invalid, no files are written to disk (all-or-nothing)."""
-        # We patch the base_dir to a temp path so we can inspect written files
-        import importlib
-
-        # Use monkeypatch via direct tmp_path check
         mid = create_measurement_id()
 
         # A valid JPEG and a GIF: expect 415 and nothing on disk
