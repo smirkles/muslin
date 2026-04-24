@@ -22,7 +22,7 @@ The user sees a form with seven labelled fields:
 - **Height** (cm)
 - **Back length** (cm)
 
-Each field has a brief helper text explaining where to measure. Validation happens on blur; after a field has been touched, it re-validates on every change. On submit, all fields are validated (including any not yet touched); if any have errors the errors are shown and `onSubmit` is not called. The submit button is only disabled while `isLoading` is true — it is never pre-disabled based on validation state. The form does not reset after submit (the parent decides what to do next).
+Each field has a brief helper text explaining where to measure. Validation happens on blur; after a field has been touched, it re-validates on every change. The submit button is disabled while any field is invalid or empty, or while `isLoading` is true. The form does not reset after submit (the parent decides what to do next).
 
 ## Inputs and outputs
 
@@ -61,10 +61,10 @@ interface Measurements {
 ### Errors
 
 - Inline error per field: shown on blur, then live on each change once the field has been touched.
-- On submit: all fields are validated; any untouched fields are marked touched and errors shown.
-- `onSubmit` fires only when all fields pass validation.
-- Submit button is only disabled when `isLoading` is true.
+- `onSubmit` fires only when all fields pass client validation.
+- Submit button is disabled while any field is invalid or empty, or while `isLoading` is true.
 - `serverErrors` prop displays backend 422 errors beneath the relevant field (overrides client error for that field; cleared when the user edits the field).
+- Use `parseServerErrors(detail)` from `measurements.ts` to translate a FastAPI 422 detail array into the `serverErrors` shape.
 
 ## Acceptance criteria
 
@@ -74,7 +74,8 @@ interface Measurements {
 - [ ] Given `apex_to_apex_cm` is set to `9` (below minimum) and the field loses focus, then an inline error appears.
 - [ ] Given `high_bust_cm` is set to `201` and the field loses focus, then an inline error appears.
 - [ ] Given a field has an error and the user corrects it (on change), then the error clears.
-- [ ] Given all fields are empty and the user clicks submit, then all 7 fields show errors and `onSubmit` is NOT called.
+- [ ] Given the form renders with all fields empty, then the submit button is disabled.
+- [ ] Given all 7 fields have valid values, then the submit button is enabled.
 - [ ] Given all 7 fields have valid values and the user clicks submit, then `onSubmit` is called once with the correct `Measurements` object.
 - [ ] Given `isLoading={true}`, then the submit button shows a loading state and all inputs are disabled.
 - [ ] Given `serverErrors={{ bust_cm: "Server says no" }}` is passed, then that error appears beneath the bust field.

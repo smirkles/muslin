@@ -10,34 +10,6 @@ export interface Measurements {
 
 type ValidationErrors = Record<keyof Measurements, string | undefined>;
 
-const RULES: Record<keyof Measurements, { min: number; max: number; label: string }> = {
-  bust_cm: { min: 60, max: 200, label: "Full bust" },
-  high_bust_cm: { min: 60, max: 200, label: "High bust" },
-  apex_to_apex_cm: { min: 10, max: 30, label: "Bust point to bust point" },
-  waist_cm: { min: 40, max: 200, label: "Waist" },
-  hip_cm: { min: 60, max: 200, label: "Hip" },
-  height_cm: { min: 120, max: 220, label: "Height" },
-  back_length_cm: { min: 30, max: 60, label: "Back length" },
-};
-
-export function validateMeasurements(
-  values: Partial<Measurements>,
-): ValidationErrors {
-  const errors = {} as ValidationErrors;
-  for (const key of Object.keys(RULES) as (keyof Measurements)[]) {
-    const { min, max } = RULES[key];
-    const val = values[key];
-    if (val === undefined || val === null || isNaN(val as number)) {
-      errors[key] = `Required`;
-    } else if ((val as number) < min || (val as number) > max) {
-      errors[key] = `Must be between ${min} and ${max} cm`;
-    } else {
-      errors[key] = undefined;
-    }
-  }
-  return errors;
-}
-
 export const FIELD_META: Record<
   keyof Measurements,
   { label: string; helper: string; min: number; max: number }
@@ -95,3 +67,42 @@ export const FIELD_ORDER: (keyof Measurements)[] = [
   "height_cm",
   "back_length_cm",
 ];
+
+export function validateMeasurements(
+  values: Partial<Measurements>,
+): ValidationErrors {
+  const errors = {} as ValidationErrors;
+  for (const key of FIELD_ORDER) {
+    const { min, max } = FIELD_META[key];
+    const val = values[key];
+    if (val === undefined || val === null || isNaN(val as number)) {
+      errors[key] = `Required`;
+    } else if ((val as number) < min || (val as number) > max) {
+      errors[key] = `Must be between ${min} and ${max} cm`;
+    } else {
+      errors[key] = undefined;
+    }
+  }
+  return errors;
+}
+
+export interface FastApiValidationError {
+  loc: string[];
+  msg: string;
+  type: string;
+}
+
+/** Translates a FastAPI 422 detail array into per-field error strings for the serverErrors prop. */
+export function parseServerErrors(
+  detail: FastApiValidationError[],
+): Partial<Record<keyof Measurements, string>> {
+  const result: Partial<Record<keyof Measurements, string>> = {};
+  const fieldKeys = new Set(Object.keys(FIELD_META));
+  for (const err of detail) {
+    const field = err.loc[err.loc.length - 1];
+    if (fieldKeys.has(field)) {
+      result[field as keyof Measurements] = err.msg;
+    }
+  }
+  return result;
+}

@@ -47,10 +47,10 @@ describe("MeasurementForm", () => {
       expect(screen.getByRole("button", { name: /calculate my fit/i })).toBeTruthy();
     });
 
-    it("submit button is enabled by default (not disabled for empty fields)", () => {
+    it("submit button is disabled when fields are empty", () => {
       render(<MeasurementForm onSubmit={vi.fn()} />);
       const btn = screen.getByRole("button", { name: /calculate my fit/i });
-      expect(btn).not.toBeDisabled();
+      expect(btn).toBeDisabled();
     });
   });
 
@@ -107,15 +107,17 @@ describe("MeasurementForm", () => {
   });
 
   describe("submit behaviour", () => {
-    it("validates all fields on submit and does not call onSubmit when fields are empty", async () => {
+    it("submit button becomes enabled when all 7 fields have valid values", async () => {
       const user = userEvent.setup();
-      const onSubmit = vi.fn();
-      render(<MeasurementForm onSubmit={onSubmit} />);
-      await user.click(screen.getByRole("button", { name: /calculate my fit/i }));
-      expect(onSubmit).not.toHaveBeenCalled();
-      // Should show errors for all untouched empty fields
-      const errors = screen.getAllByText(/must be between|required/i);
-      expect(errors.length).toBeGreaterThan(0);
+      render(<MeasurementForm onSubmit={vi.fn()} />);
+      const btn = screen.getByRole("button", { name: /calculate my fit/i });
+      expect(btn).toBeDisabled();
+      for (const [label, value] of Object.entries(VALID_VALUES)) {
+        const input = screen.getByLabelText(new RegExp(label, "i"));
+        await user.clear(input);
+        await user.type(input, value);
+      }
+      expect(btn).not.toBeDisabled();
     });
 
     it("calls onSubmit with correct Measurements when all fields are valid", async () => {
@@ -162,7 +164,7 @@ describe("MeasurementForm", () => {
       render(
         <MeasurementForm
           onSubmit={vi.fn()}
-          serverErrors={{ bust_cm: "Server says no" } as never}
+          serverErrors={{ bust_cm: "Server says no" }}
         />,
       );
       expect(screen.getByText("Server says no")).toBeTruthy();
@@ -173,7 +175,7 @@ describe("MeasurementForm", () => {
       render(
         <MeasurementForm
           onSubmit={vi.fn()}
-          serverErrors={{ bust_cm: "Server says no" } as never}
+          serverErrors={{ bust_cm: "Server says no" }}
         />,
       );
       expect(screen.getByText("Server says no")).toBeTruthy();

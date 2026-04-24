@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { validateMeasurements, type Measurements } from "./measurements";
+import {
+  validateMeasurements,
+  parseServerErrors,
+  type Measurements,
+  type FastApiValidationError,
+} from "./measurements";
 
 const VALID: Measurements = {
   bust_cm: 96,
@@ -123,5 +128,45 @@ describe("validateMeasurements", () => {
   // NaN / empty string treatment
   it("rejects NaN as empty/missing", () => {
     expect(validateMeasurements({ ...VALID, bust_cm: NaN }).bust_cm).toBeDefined();
+  });
+});
+
+describe("parseServerErrors", () => {
+  it("maps a known field error to the correct key", () => {
+    const detail: FastApiValidationError[] = [
+      { loc: ["body", "bust_cm"], msg: "value too small", type: "value_error" },
+    ];
+    const result = parseServerErrors(detail);
+    expect(result.bust_cm).toBe("value too small");
+  });
+
+  it("maps multiple field errors", () => {
+    const detail: FastApiValidationError[] = [
+      { loc: ["body", "bust_cm"], msg: "err1", type: "value_error" },
+      { loc: ["body", "waist_cm"], msg: "err2", type: "value_error" },
+    ];
+    const result = parseServerErrors(detail);
+    expect(result.bust_cm).toBe("err1");
+    expect(result.waist_cm).toBe("err2");
+  });
+
+  it("ignores errors for unknown fields", () => {
+    const detail: FastApiValidationError[] = [
+      { loc: ["body", "unknown_field"], msg: "err", type: "value_error" },
+    ];
+    const result = parseServerErrors(detail);
+    expect(Object.keys(result)).toHaveLength(0);
+  });
+
+  it("returns empty object for empty detail array", () => {
+    expect(parseServerErrors([])).toEqual({});
+  });
+
+  it("uses the last element of loc as the field name", () => {
+    const detail: FastApiValidationError[] = [
+      { loc: ["body", "apex_to_apex_cm"], msg: "out of range", type: "value_error" },
+    ];
+    const result = parseServerErrors(detail);
+    expect(result.apex_to_apex_cm).toBe("out of range");
   });
 });

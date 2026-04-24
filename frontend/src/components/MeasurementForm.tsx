@@ -100,18 +100,15 @@ export function MeasurementForm({
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    // Mark all fields as touched and validate everything
-    const allTouched: Touched = Object.fromEntries(
-      FIELD_ORDER.map((k) => [k, true]),
-    ) as Touched;
-    setTouched(allTouched);
     const parsed = parseValues(values);
     const errs = validateMeasurements(parsed);
-    setClientErrors(errs);
-    const hasErrors = FIELD_ORDER.some((k) => errs[k] !== undefined);
-    if (hasErrors) return;
+    if (FIELD_ORDER.some((k) => errs[k] !== undefined)) return;
     onSubmit(parsed as Measurements);
   }
+
+  const isFormValid = FIELD_ORDER.every(
+    (k) => validateMeasurements(parseValues(values))[k] === undefined,
+  );
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-5">
@@ -164,7 +161,7 @@ export function MeasurementForm({
       })}
       <button
         type="submit"
-        disabled={isLoading}
+        disabled={isLoading || !isFormValid}
         aria-label="Calculate my fit"
         className="w-full rounded bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:bg-indigo-300"
       >
