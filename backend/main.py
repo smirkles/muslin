@@ -2,12 +2,15 @@
 
 import os
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from routes.dev import router as dev_router
 from routes.measurements import router as measurements_router
 from routes.patterns import router as patterns_router
+
+load_dotenv(".env.local")
 
 app = FastAPI(
     title="Muslin API",

@@ -10,7 +10,7 @@ dependencies = [
     "pydantic>=2.6.0",
     "lxml>=5.1.0",
     "numpy>=1.26.0",
-    "anthropic>=0.25.0",
+    "anthropic>=0.40,<1",
     "python-multipart>=0.0.9",
     "pillow>=10.2.0",
     "python-dotenv>=1.0.0",
@@ -53,6 +53,9 @@ target-version = ["py311"]
 testpaths = ["tests"]
 asyncio_mode = "auto"
 pythonpath = ["."]
+markers = [
+    "integration: hits real external APIs; requires credentials (ANTHROPIC_API_KEY)",
+]
 
 [tool.mypy]
 python_version = "3.11"

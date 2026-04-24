@@ -3,11 +3,9 @@
 Tests use a patched agent to avoid real API calls.
 """
 
-import os
 from unittest.mock import MagicMock, patch
 
 import anthropic
-import pytest
 from fastapi.testclient import TestClient
 
 from main import app
@@ -85,11 +83,16 @@ class TestHelloAgentRoute:
         assert response.status_code == 422
 
     def test_missing_api_key_returns_500(self) -> None:
-        """POST /dev/hello-agent returns 500 when ANTHROPIC_API_KEY is unset."""
+        """POST /dev/hello-agent returns 500 with the spec-documented detail string.
+
+        The route must hardcode the detail — not pass through the exception message —
+        so this test uses a different exception message to prove the contract holds
+        regardless of what ConfigError contains.
+        """
         from lib.diagnosis.agent import ConfigError
 
         mock_agent = MagicMock()
-        mock_agent.run.side_effect = ConfigError("ANTHROPIC_API_KEY not configured")
+        mock_agent.run.side_effect = ConfigError("some long developer-facing message")
 
         with patch("routes.dev.get_agent", return_value=mock_agent):
             response = client.post("/dev/hello-agent", json={"name": "Steph"})
