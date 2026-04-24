@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 300 400">
+  <!-- Group with two path children -->
+  <g id="bodice-front">
+    <path id="front-outline" d="M 10,10 L 100,10 L 100,200 L 10,200 Z" fill="none" stroke="black" stroke-width="1"/>
+    <path id="front-seam" d="M 10,10 L 100,10" fill="none" stroke="black" stroke-width="1"/>
+  </g>
+  <!-- Nested group: outer-g contains inner-g which contains a path -->
+  <g id="outer-g">
+    <g id="inner-g">
+      <path id="nested-path" d="M 200,10 L 280,10 L 280,100 L 200,100 Z" fill="none" stroke="black" stroke-width="1"/>
+    </g>
+  </g>
+  <!-- Standalone element outside any group -->
+  <path id="sibling-path" d="M 150,300 L 200,300 L 200,350 L 150,350 Z" fill="none" stroke="gray" stroke-width="1"/>
+</svg>
