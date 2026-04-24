@@ -74,7 +74,7 @@ def substitute(template: str, variables: dict[str, str]) -> str:
             )
 
     # Second pass: substitute all placeholders
-    def replacer(match: re.Match) -> str:  # type: ignore[type-arg]
+    def replacer(match: re.Match[str]) -> str:
         return variables[match.group(1)]
 
     return pattern.sub(replacer, template)

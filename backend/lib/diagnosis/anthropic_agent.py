@@ -38,7 +38,6 @@ class AnthropicAgent:
             prompts_root: Override the root prompts directory (used in tests).
         """
         self._prompts_root = prompts_root
-        self._model = os.environ.get("ANTHROPIC_MODEL", _DEFAULT_MODEL)
 
     def run(self, prompt_name: str, variables: dict[str, str]) -> AgentResponse:
         """Call Claude with the named prompt and return a structured response.
@@ -69,7 +68,7 @@ class AnthropicAgent:
         rendered_prompt = substitute(template, variables)
 
         # Call the Anthropic API
-        model = os.environ.get("ANTHROPIC_MODEL", self._model)
+        model = os.environ.get("ANTHROPIC_MODEL", _DEFAULT_MODEL)
         client = anthropic.Anthropic(api_key=api_key)
         message = client.messages.create(
             model=model,

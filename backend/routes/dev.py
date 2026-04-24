@@ -89,7 +89,8 @@ def post_hello_agent(body: HelloAgentRequest) -> HelloAgentResponse:
     try:
         response = agent.run("hello_world", {"name": body.name})
     except ConfigError as exc:
-        raise HTTPException(status_code=500, detail=str(exc)) from exc
+        logger.warning("ANTHROPIC_API_KEY not configured: %s", exc)
+        raise HTTPException(status_code=500, detail="ANTHROPIC_API_KEY not configured") from exc
     except anthropic.APIError as exc:
         logger.exception("Anthropic API error calling /dev/hello-agent: %s", exc)
         raise HTTPException(status_code=502, detail="Claude API error") from exc
