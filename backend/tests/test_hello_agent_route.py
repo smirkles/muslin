@@ -3,11 +3,9 @@
 Tests use a patched agent to avoid real API calls.
 """
 
-import os
 from unittest.mock import MagicMock, patch
 
 import anthropic
-import pytest
 from fastapi.testclient import TestClient
 
 from main import app

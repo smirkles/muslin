@@ -5,8 +5,8 @@ must pass without an Anthropic API key.
 """
 
 import ast
+import dataclasses
 import os
-import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -49,9 +49,7 @@ class TestLoadPrompt:
         result = load_prompt("hello_world", prompts_root=tmp_path)
         assert result == "Default version content"
 
-    def test_load_prompt_missing_file_raises_file_not_found(
-        self, tmp_path: Path
-    ) -> None:
+    def test_load_prompt_missing_file_raises_file_not_found(self, tmp_path: Path) -> None:
         """load_prompt raises FileNotFoundError when prompt file does not exist."""
         from lib.diagnosis.prompts import load_prompt
 
@@ -61,9 +59,7 @@ class TestLoadPrompt:
         # The error message must include the attempted path
         assert "hello_world" in str(exc_info.value)
 
-    def test_load_prompt_missing_file_error_includes_path(
-        self, tmp_path: Path
-    ) -> None:
+    def test_load_prompt_missing_file_error_includes_path(self, tmp_path: Path) -> None:
         """FileNotFoundError message includes the attempted path."""
         from lib.diagnosis.prompts import load_prompt
 
@@ -153,7 +149,7 @@ class TestAgentResponse:
         from lib.diagnosis.agent import AgentResponse
 
         r = AgentResponse(text="hi", model="m", input_tokens=1, output_tokens=1)
-        with pytest.raises(Exception):  # dataclasses.FrozenInstanceError
+        with pytest.raises(dataclasses.FrozenInstanceError):
             r.text = "changed"  # type: ignore[misc]
 
 
@@ -180,9 +176,7 @@ class TestAnthropicAgent:
         msg.model = model
         return msg
 
-    def test_run_returns_agent_response_with_correct_fields(
-        self, tmp_path: Path
-    ) -> None:
+    def test_run_returns_agent_response_with_correct_fields(self, tmp_path: Path) -> None:
         """AnthropicAgent.run returns AgentResponse with correct text and token counts."""
         # Set up prompt file
         prompt_dir = tmp_path / "hello_world"
@@ -221,7 +215,9 @@ class TestAnthropicAgent:
         )
 
         with (
-            patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key", "ANTHROPIC_MODEL": "claude-opus-4-7"}),
+            patch.dict(
+                os.environ, {"ANTHROPIC_API_KEY": "test-key", "ANTHROPIC_MODEL": "claude-opus-4-7"}
+            ),
             patch("lib.diagnosis.anthropic_agent.anthropic.Anthropic") as mock_client_cls,
         ):
             mock_client = MagicMock()
@@ -245,8 +241,8 @@ class TestAnthropicAgent:
         env.pop("ANTHROPIC_API_KEY", None)
 
         with patch.dict(os.environ, env, clear=True):
-            from lib.diagnosis.anthropic_agent import AnthropicAgent
             from lib.diagnosis.agent import ConfigError
+            from lib.diagnosis.anthropic_agent import AnthropicAgent
 
             agent = AnthropicAgent(prompts_root=tmp_path)
             with pytest.raises(ConfigError) as exc_info:
@@ -305,15 +301,15 @@ class TestImportHygiene:
                 if isinstance(node, ast.Import):
                     for alias in node.names:
                         for bad in forbidden:
-                            assert bad not in alias.name, (
-                                f"{py_file.name} imports forbidden module '{alias.name}'"
-                            )
+                            assert (
+                                bad not in alias.name
+                            ), f"{py_file.name} imports forbidden module '{alias.name}'"
                 elif isinstance(node, ast.ImportFrom):
                     module = node.module or ""
                     for bad in forbidden:
-                        assert bad not in module, (
-                            f"{py_file.name} imports from forbidden module '{module}'"
-                        )
+                        assert (
+                            bad not in module
+                        ), f"{py_file.name} imports from forbidden module '{module}'"
 
 
 # ---------------------------------------------------------------------------
