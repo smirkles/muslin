@@ -68,20 +68,20 @@ interface Measurements {
 
 ## Acceptance criteria
 
-- [ ] Given the form renders, then all 7 labelled fields are present with their helper text.
-- [ ] Given `bust_cm` is set to `59` (below minimum) and the field loses focus, then an inline error appears for that field only.
-- [ ] Given `bust_cm` is set to `201` (above maximum) and the field loses focus, then an inline error appears.
-- [ ] Given `apex_to_apex_cm` is set to `9` (below minimum) and the field loses focus, then an inline error appears.
-- [ ] Given `high_bust_cm` is set to `201` and the field loses focus, then an inline error appears.
-- [ ] Given a field has an error and the user corrects it (on change), then the error clears.
-- [ ] Given the form renders with all fields empty, then the submit button is disabled.
-- [ ] Given all 7 fields have valid values, then the submit button is enabled.
-- [ ] Given all 7 fields have valid values and the user clicks submit, then `onSubmit` is called once with the correct `Measurements` object.
-- [ ] Given `isLoading={true}`, then the submit button shows a loading state and all inputs are disabled.
-- [ ] Given `serverErrors={{ bust_cm: "Server says no" }}` is passed, then that error appears beneath the bust field.
-- [ ] Given a `serverError` is shown for a field and the user edits that field, then the server error clears.
-- [ ] `pnpm test` passes with all tests green.
-- [ ] `pnpm lint` exits 0.
+- [x] Given the form renders, then all 7 labelled fields are present with their helper text.
+- [x] Given `bust_cm` is set to `59` (below minimum) and the field loses focus, then an inline error appears for that field only.
+- [x] Given `bust_cm` is set to `201` (above maximum) and the field loses focus, then an inline error appears.
+- [x] Given `apex_to_apex_cm` is set to `9` (below minimum) and the field loses focus, then an inline error appears.
+- [x] Given `high_bust_cm` is set to `201` and the field loses focus, then an inline error appears.
+- [x] Given a field has an error and the user corrects it (on change), then the error clears.
+- [x] Given the form renders with all fields empty, then the submit button is disabled.
+- [x] Given all 7 fields have valid values, then the submit button is enabled.
+- [x] Given all 7 fields have valid values and the user clicks submit, then `onSubmit` is called once with the correct `Measurements` object.
+- [x] Given `isLoading={true}`, then the submit button shows a loading state and all inputs are disabled.
+- [x] Given `serverErrors={{ bust_cm: "Server says no" }}` is passed, then that error appears beneath the bust field.
+- [x] Given a `serverError` is shown for a field and the user edits that field, then the server error clears.
+- [x] `pnpm test` passes with all tests green.
+- [x] `pnpm lint` exits 0.
 
 ## Out of scope
 
@@ -98,7 +98,7 @@ interface Measurements {
 - Validation function `validateMeasurements(values)` exported from `frontend/src/lib/measurements.ts` — pure function, no React, mirrors the ranges from spec 07.
 - No form library (react-hook-form, etc.) — too much overhead for 7 fields.
 - Tailwind for styling — keep it clean and functional, not polished. Labels, inputs, error text, button. No design system needed yet.
-- Track `touched: Record<keyof Measurements, boolean>` — field becomes touched on first blur; live validation only runs for touched fields; on submit, all fields are marked touched before validating.
+- Track `touched: Record<keyof Measurements, boolean>` — field becomes touched on first blur; live validation only runs for touched fields. Submit is disabled until all fields are valid, so the handler just validates and calls `onSubmit`.
 
 ## Dependencies
 
@@ -125,7 +125,7 @@ interface Measurements {
 
 - `frontend/src/lib/measurements.ts` — `Measurements` interface (7 fields), `validateMeasurements()` pure function, `FIELD_META` (label + helper + range per field), `FIELD_ORDER` array for consistent field rendering.
 - `frontend/src/components/MeasurementForm.tsx` — controlled form with `touched` state per field. Validates on blur, live-validates on change after first blur. Submit validates all fields at once; `onSubmit` only fires when all pass. `isLoading` disables all inputs and the button. `serverErrors` shows backend errors per field; clears on first edit of that field. Button uses `aria-label="Calculate my fit"` so the accessible name stays stable when text changes to "Calculating…".
-- Tests: 23 unit tests for `validateMeasurements`, 13 component tests. 41 frontend tests total pass. ESLint exits 0.
+- Tests: 34 unit tests (`validateMeasurements` + `parseServerErrors`), 15 component tests. 54 frontend tests total pass. ESLint exits 0.
 
 ### Deviations from spec
 
@@ -134,6 +134,15 @@ None. All 12 acceptance criteria implemented as specified.
 ## Open questions
 
 None.
+
+## Cleanup notes
+
+- **Checkboxes marked:** 14 of 14
+- **Stray files:** none in the feature branch; `docs/reviews/`, `docs/specs/08-*.md`, `docs/specs/09-*.md` are correctly untracked and belong to other work
+- **TODOs/FIXMEs:** none found
+- **Linter/test result:** PASS — 54/54 frontend tests, 187/187 backend tests, ESLint 0 errors, tsc clean, ruff + black clean
+- **Stale content fixed:** test count in implementation notes updated (41 → 54); technical approach description of submit handler updated to reflect disabled-until-valid behaviour
+- **Items for Steph:** none — ready to merge
 
 ## Notes for implementer
 
