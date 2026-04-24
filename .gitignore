@@ -37,6 +37,7 @@ Thumbs.db
 
 # Claude Code local settings
 .claude/settings.local.json
+.claude/worktrees/
 
 # SMPL model files (license-restricted, not shareable)
 assets/smpl_models/*.pkl

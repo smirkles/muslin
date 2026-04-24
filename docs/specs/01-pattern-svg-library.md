@@ -1,7 +1,7 @@
 # Spec: Pattern SVG Manipulation Library
 
 **Spec ID:** 01-pattern-svg-library
-**Status:** ready-for-implementation
+**Status:** implemented
 **Created:** 2026-04-23
 **Depends on:** none
 
@@ -39,17 +39,17 @@ All functions take a `Pattern` and parameters, return a new `Pattern` (immutable
 
 ## Acceptance criteria
 
-- [ ] Given a valid SVG file, when `load_pattern` is called, then it returns a Pattern object with all `<path>` and `<g>` elements accessible by id.
-- [ ] Given a Pattern, when `render_pattern` is called, then the output is a valid SVG string that parses back to an equivalent Pattern (round-trip stable).
-- [ ] Given a Pattern with an element `foo`, when `translate_element(p, "foo", 10, 5)` is called, then the returned Pattern's `foo` element has all coordinates shifted by (10, 5). The original Pattern is unchanged.
-- [ ] Given a Pattern, when `translate_element` is called with a non-existent id, then `ElementNotFound` is raised.
-- [ ] Given a Pattern, when `rotate_element(p, "foo", 90, (0, 0))` is called, then the element is rotated 90° clockwise around the origin. Verify with at least 3 known rotation pairs.
-- [ ] Given a Pattern, when `slash_line` is called, then a new `<line>` element with the given id is added. The rest of the pattern is unchanged.
-- [ ] Given a Pattern with a slash line, when `spread_at_line(p, "slash1", 2.5, (1, 0))` is called, then the elements on one side of the slash are translated by (2.5, 0), and the slash line extends to cover the gap.
-- [ ] Given a Pattern, when `add_dart` is called, then a dart-shaped polygon (triangle pointing toward the pattern interior) is added with the given id.
-- [ ] Given a Pattern with seams A (length 10) and B (length 12), when `true_seam_length(p, "A", "B")` is called, then seam A's endpoint is extended to make its length 12 (within floating-point tolerance).
-- [ ] All operations are pure — calling a function twice with identical inputs produces identical output Patterns.
-- [ ] Test coverage ≥ 90% on the library module.
+- [x] Given a valid SVG file, when `load_pattern` is called, then it returns a Pattern object with all `<path>` and `<g>` elements accessible by id.
+- [x] Given a Pattern, when `render_pattern` is called, then the output is a valid SVG string that parses back to an equivalent Pattern (round-trip stable).
+- [x] Given a Pattern with an element `foo`, when `translate_element(p, "foo", 10, 5)` is called, then the returned Pattern's `foo` element has all coordinates shifted by (10, 5). The original Pattern is unchanged.
+- [x] Given a Pattern, when `translate_element` is called with a non-existent id, then `ElementNotFound` is raised.
+- [x] Given a Pattern, when `rotate_element(p, "foo", 90, (0, 0))` is called, then the element is rotated 90° clockwise around the origin. Verify with at least 3 known rotation pairs.
+- [x] Given a Pattern, when `slash_line` is called, then a new `<line>` element with the given id is added. The rest of the pattern is unchanged.
+- [x] Given a Pattern with a slash line, when `spread_at_line(p, "slash1", 2.5, (1, 0))` is called, then the elements on one side of the slash are translated by (2.5, 0), and the slash line extends to cover the gap.
+- [x] Given a Pattern, when `add_dart` is called, then a dart-shaped polygon (triangle pointing toward the pattern interior) is added with the given id.
+- [x] Given a Pattern with seams A (length 10) and B (length 12), when `true_seam_length(p, "A", "B")` is called, then seam A's endpoint is extended to make its length 12 (within floating-point tolerance).
+- [x] All operations are pure — calling a function twice with identical inputs produces identical output Patterns.
+- [x] Test coverage ≥ 90% on the library module (achieved: 98%).
 
 ## Out of scope
 
@@ -95,3 +95,42 @@ None. Ready for implementation.
 - For `rotate_element`, use a 2x2 rotation matrix applied to every coordinate in every `<path>`'s `d` attribute. This means parsing path commands; use `svg.path` or similar if lxml is too low-level. Check first if lxml alone suffices.
 - `spread_at_line` is the trickiest one. Don't overthink it for V1 — we can assume slash lines are straight and that the pattern is topologically simple. Document assumptions in code.
 - Immutability matters for reproducibility. Copy-on-write is the cleanest pattern.
+
+## Implementation notes
+
+### What was implemented
+
+Single-file module at `backend/lib/pattern_ops.py` (370 statements) implementing all functions from the spec:
+
+- `Pattern` class: thin wrapper around lxml `ElementTree` with `_id_index: dict[str, Element]` for O(1) lookup. `_deep_copy()` uses `copy.deepcopy` on the root element for true immutability.
+- `load_pattern` / `render_pattern` / `get_element`: straightforward lxml wrappers.
+- `translate_element` / `rotate_element`: dispatch on element tag (`<path>`, `<polygon>`, `<line>`, `<text>`). Path `d` attribute parsing handles M/L/H/V/C/S/Q/T/A/Z commands.
+- `slash_line`: appends a `<line>` to the SVG root with namespace awareness.
+- `spread_at_line`: classifies elements by centroid signed distance from the slash line's perpendicular normal. Elements on the right side (or on the line) are translated. The slash line's x2/y2 is extended by the spread distance.
+- `add_dart`: builds an isosceles triangle polygon from tip, direction angle, width, and length.
+- `true_seam_length`: finds Euclidean length of seam B (start→end), then rescales seam A's endpoint along its own direction vector to match.
+
+Three fixture SVGs created in `backend/tests/fixtures/patterns/`: `triangle.svg`, `rectangle.svg`, `with_dart.svg`.
+
+**Test suite:** 83 tests in `backend/tests/test_pattern_ops.py` covering all 11 acceptance criteria. Hypothesis property-based test for rotation round-trip (50 examples). 98% coverage on `lib/pattern_ops.py`.
+
+### Deviations from spec
+
+- lxml was sufficient for all path parsing — no `svg.path` library needed. A custom tokenizer (`_TOKEN_RE`) handles all SVG path command formats.
+- `spread_at_line` classifies elements by centroid, not by geometric intersection. Elements crossing the slash line are moved with the right side. This is documented in the docstring as a V1 assumption.
+- `true_seam_length` measures length as the Euclidean distance from the *first* to the *last* coordinate pair (not the sum of segment lengths). This matches the spec's example (straight seams) and is documented.
+- `translate_element` on a `<g>` element does nothing (no-op) — the spec doesn't specify group translation behavior; moving individual children is more predictable.
+
+### Open questions for Steph
+
+- Should `spread_at_line` handle elements that straddle the slash line differently? Currently they move with the right side (conservative). For real FBA use cases, straddling elements might need to be split.
+- `true_seam_length` uses start→end Euclidean distance. For curved seams (future work), this will be wrong — should we add a warning/flag for curved paths?
+- `translate_element` on `<g>` is currently a no-op. Should it recurse into children instead?
+
+### Cleanup notes
+
+- All 11 spec acceptance criteria are checked off above.
+- No TODOs left in source code (future-work items are in docstrings, not inline TODOs).
+- Ruff + black both pass clean.
+- All 99 backend tests pass (83 new + 16 pre-existing).
+- No new ADRs needed — all decisions follow existing patterns or are self-evident V1 simplifications documented in code.

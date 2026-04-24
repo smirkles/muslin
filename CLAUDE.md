@@ -66,11 +66,19 @@ cd evals && uv run python run_eval.py --prompt-version v1_baseline
 ## Workflow for new features
 
 1. You write or generate a spec in `docs/specs/NN-name.md` (use `/spec` command).
-2. `/implement NN-name` — agent writes failing tests first, then implementation until passing.
+2. `/implement NN-name` — agent creates branch `feat/NN-name`, writes failing tests first, then implementation until passing. **Never commits to main directly.**
 3. `/review` — a fresh-context reviewer agent checks the output against the spec.
-4. You review, commit.
+4. You review, merge `feat/NN-name` → `main`, delete branch.
 
 For overnight work: queue specs, then `/implement` them in sequence. See `docs/workflows/overnight-delegation.md` (TBD).
+
+## Branch rules
+
+- `main` is always clean and passing. No direct commits to main for feature work.
+- Every spec gets its own branch: `feat/NN-name` (e.g. `feat/01-pattern-svg-library`).
+- Parallel agents use separate feature branches — no conflicts possible.
+- Merge only after `/review` passes.
+- Hotfixes on `main` are the only exception; note it explicitly in the commit message.
 
 ## What NOT to do
 

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200" viewBox="0 0 200 200">
+  <g id="pattern-group">
+    <path id="triangle" d="M 50,150 L 100,50 L 150,150 Z" fill="none" stroke="black" stroke-width="1"/>
+    <text id="label" x="100" y="170">Triangle</text>
+  </g>
+</svg>

@@ -1,0 +1,7 @@
+{
+  "id": "bodice-v1",
+  "name": "Basic Fitted Bodice",
+  "description": "A simple fitted bodice block. Good starting point for FBA and swayback adjustments.",
+  "piece_count": 2,
+  "svg_file": "bodice-v1.svg"
+}

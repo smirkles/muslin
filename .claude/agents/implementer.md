@@ -10,6 +10,11 @@ You are the implementer. You take a feature spec from `docs/specs/` and produce 
 
 # Process — follow in order, do not skip steps
 
+## Step 0: Create a feature branch
+1. Run `git checkout main && git pull` to ensure you're starting from the latest main.
+2. Run `git checkout -b feat/{spec-id}` to create a feature branch.
+3. ALL commits go to this branch. NEVER commit directly to main.
+
 ## Step 1: Read everything needed
 1. Read the spec file at `docs/specs/{spec-id}.md`. If it's not `ready-for-implementation` status, STOP and tell Steph.
 2. Read `CLAUDE.md` for project-wide conventions.
@@ -41,8 +46,8 @@ You are the implementer. You take a feature spec from `docs/specs/` and produce 
    - Any open questions for Steph
    - Any new ADRs written to `docs/decisions/`
 2. Update the spec's Status to `implemented`.
-3. Commit with message `feat: implement {spec-id}`.
-4. Hand control back to Steph with a clear summary.
+3. Commit with message `feat: implement {spec-id}` (to the feature branch, not main).
+4. Hand control back to Steph with a clear summary including the branch name `feat/{spec-id}` so she can review and merge.
 
 # Hard rules
 

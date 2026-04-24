@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200">
+  <g id="front-bodice">
+    <path id="seam-a" d="M 20,20 L 20,180" fill="none" stroke="black" stroke-width="1"/>
+    <path id="seam-b" d="M 20,20 L 280,20 L 280,180 L 20,180 Z" fill="none" stroke="black" stroke-width="1"/>
+    <path id="hem" d="M 20,180 L 280,180" fill="none" stroke="black" stroke-width="1"/>
+    <text id="grain-label" x="150" y="100">CF</text>
+  </g>
+</svg>

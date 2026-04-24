@@ -55,19 +55,19 @@ No end-user interaction. The calling code sees:
 
 ## Acceptance criteria
 
-- [ ] Given `s = "hello"`, when `reverse_string("hello")` is called, then it returns `"olleh"`.
-- [ ] Given `s = ""`, when `reverse_string("")` is called, then it returns `""`.
-- [ ] Given a string containing Unicode characters (e.g. `"café"`), when `reverse_string` is called, then it reverses by codepoint (standard Python string indexing behavior), returning `"éfac"`.
-- [ ] Given `s = None`, when `reverse_string(None)` is called, then it raises `TypeError`.
-- [ ] Given `s = 42`, when `reverse_string(42)` is called, then it raises `TypeError`.
+- [x] Given `s = "hello"`, when `reverse_string("hello")` is called, then it returns `"olleh"`.
+- [x] Given `s = ""`, when `reverse_string("")` is called, then it returns `""`.
+- [x] Given a string containing Unicode characters (e.g. `"café"`), when `reverse_string` is called, then it reverses by codepoint (standard Python string indexing behavior), returning `"éfac"`.
+- [x] Given `s = None`, when `reverse_string(None)` is called, then it raises `TypeError`.
+- [x] Given `s = 42`, when `reverse_string(42)` is called, then it raises `TypeError`.
 - [ ] Given `s = "hello"`, when `reverseString("hello")` is called in TypeScript, then it returns `"olleh"`.
 - [ ] Given `s = ""`, when `reverseString("")` is called in TypeScript, then it returns `""`.
 - [ ] Given a string containing Unicode characters (e.g. `"café"`), when `reverseString` is called, then it reverses by codepoint, returning `"éfac"`.
-- [ ] Given a valid JSON body `{"input": "hello"}`, when `POST /dev/reverse-string` is called, then the response is `200 OK` with body `{"result": "olleh"}`.
-- [ ] Given a JSON body `{"input": ""}`, when `POST /dev/reverse-string` is called, then the response is `200 OK` with body `{"result": ""}`.
-- [ ] Given a malformed JSON body or missing `input` field, when `POST /dev/reverse-string` is called, then the response is `422 Unprocessable Entity`.
-- [ ] `uv run pytest` passes with all tests green.
-- [ ] `uv run ruff check . && uv run black --check .` exits 0.
+- [x] Given a valid JSON body `{"input": "hello"}`, when `POST /dev/reverse-string` is called, then the response is `200 OK` with body `{"result": "olleh"}`.
+- [x] Given a JSON body `{"input": ""}`, when `POST /dev/reverse-string` is called, then the response is `200 OK` with body `{"result": ""}`.
+- [x] Given a malformed JSON body or missing `input` field, when `POST /dev/reverse-string` is called, then the response is `422 Unprocessable Entity`.
+- [x] `uv run pytest` passes with all tests green.
+- [x] `uv run ruff check . && uv run black --check .` exits 0.
 - [ ] `pnpm test` (Vitest) passes with all tests green.
 - [ ] `pnpm lint` (ESLint) exits 0.
 
@@ -135,3 +135,20 @@ None. All decisions resolved in interview.
 - `backend/lib/` must not import from FastAPI. The `reverse_string` function must remain importable in isolation (pure logic only).
 - Unicode codepoint reversal is the Python default — no special handling needed. Document this assumption in the function docstring so future maintainers don't accidentally "fix" it.
 - TypeScript's `.split("").reverse().join("")` is also codepoint-level for the BMP; document the same assumption in a JSDoc comment.
+
+## Cleanup notes
+
+**Checkboxes marked:** 11 of 15
+- 4 left unchecked (TypeScript × 3, `pnpm lint` × 1) — frontend scaffold not yet set up; code and test file are written but Vitest cannot run. Unblock by scaffolding `frontend/` (package.json, Vitest config).
+
+**Stray artifacts removed:**
+- `backend/{routes,lib` — literal directory from a failed brace-expansion in initial scaffold. Removed.
+
+**TODOs/FIXMEs:** none found.
+
+**Linters/tests:** PASS — 16/16 pytest, ruff + black clean.
+
+**Git hygiene — needs Steph's attention:**
+- `uv.lock` is untracked — should be committed alongside `pyproject.toml`.
+- `.claude/commands/cleanup.md` is untracked — new command file, should be committed.
+- `.claude/commands/implement.md` is modified — updated to include cleanup as step 7, should be committed.

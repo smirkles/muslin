@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="400" viewBox="0 0 300 400">
+  <g id="back-bodice">
+    <path id="outline" d="M 50,50 L 250,50 L 250,350 L 50,350 Z" fill="none" stroke="black" stroke-width="1"/>
+    <polygon id="waist-dart" points="150,150 135,250 165,250" fill="white" stroke="black" stroke-width="1"/>
+    <path id="shoulder-seam" d="M 50,50 L 250,50" fill="none" stroke="black" stroke-width="1"/>
+    <line id="slash-line-existing" x1="150" y1="50" x2="150" y2="250" stroke="red" stroke-width="1" stroke-dasharray="4,2"/>
+  </g>
+</svg>
