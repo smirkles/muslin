@@ -26,7 +26,7 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from lxml import etree
 
-from lib.pattern_ops import (  # noqa: E402
+from lib.pattern_ops import (  # noqa: E402 — test file sets sys.path before this import
     ElementNotFound,
     GeometryError,
     Pattern,
@@ -1578,6 +1578,29 @@ class TestBezierArcLength:
         assert (
             abs(s_len - c_len) < 0.01
         ), f"S-path length {s_len:.4f} != equivalent C-path length {c_len:.4f}"
+
+    def test_s_command_after_c_matches_explicit_c_equivalent(self) -> None:
+        """S after C uses the reflected c1 from the prior C's c2; result matches explicit C.
+
+        Path: M 0,0 C 0,50 50,100 100,100 S 200,100 200,0
+        Prior c2=(50,100), prior endpoint=(100,100) → reflected c1=(150,100)
+        Equivalent: M 0,0 C 0,50 50,100 100,100 C 150,100 200,100 200,0
+        """
+        s_svg = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200">
+  <path id="p" d="M 0,0 C 0,50 50,100 100,100 S 200,100 200,0"/>
+</svg>"""
+        c_svg = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200">
+  <path id="p" d="M 0,0 C 0,50 50,100 100,100 C 150,100 200,100 200,0"/>
+</svg>"""
+        ps = load_pattern_from_string(s_svg)
+        pc = load_pattern_from_string(c_svg)
+        s_len = _path_length(get_element(ps, "p"))
+        c_len = _path_length(get_element(pc, "p"))
+        assert (
+            abs(s_len - c_len) < 0.01
+        ), f"S-after-C length {s_len:.4f} != equivalent C-C length {c_len:.4f}"
 
     def test_s_command_exceeds_chord_length(self) -> None:
         """S command arc length must exceed the chord when the path is curved."""

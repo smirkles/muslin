@@ -1103,39 +1103,6 @@ def _path_segment_lengths(d: str) -> tuple[list[tuple[float, float]], list[float
     return anchors, seg_lengths
 
 
-def _path_anchor_points(d: str) -> list[tuple[float, float]]:
-    """Return the on-curve anchor points of a path, normalised to absolute first.
-
-    For each command repetition, only the endpoint is included — Bezier control
-    points are skipped.  This gives exact arc length for M/L paths and a
-    chord-length lower-bound approximation for curved segments (spec-10 handles
-    full Bezier arc length).
-    """
-    d_norm = _transform_path_coords(d, lambda x, y: (x, y))
-    commands = _parse_path_d(d_norm)
-
-    # pairs per command repetition / which pair (0-indexed) is the endpoint
-    _STRIDE: dict[str, int] = {"M": 1, "L": 1, "C": 3, "S": 2, "Q": 2, "T": 1}
-    _EP: dict[str, int] = {"M": 0, "L": 0, "C": 2, "S": 1, "Q": 1, "T": 0}
-
-    anchors: list[tuple[float, float]] = []
-    for cmd, nums in commands:
-        upper = cmd.upper()
-        if upper not in _STRIDE:
-            continue  # Z, A (H/V already normalised to L)
-        stride = _STRIDE[upper]
-        ep = _EP[upper]
-        stride_floats = stride * 2
-        i = 0
-        while i < len(nums):
-            ep_i = i + ep * 2
-            if ep_i + 1 < len(nums):
-                anchors.append((nums[ep_i], nums[ep_i + 1]))
-            i += stride_floats
-
-    return anchors
-
-
 def _path_length(el: etree._Element) -> float:
     """Return the arc length of a path element.
 
