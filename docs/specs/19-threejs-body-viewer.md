@@ -1,7 +1,7 @@
 # Spec: Three.js Static Body Viewer
 
 **Spec ID:** 19-threejs-body-viewer
-**Status:** ready-for-implementation
+**Status:** implemented
 **Created:** 2026-04-25
 **Depends on:** 04-measurements-endpoint, 08-frontend-plumbing
 

@@ -1,7 +1,7 @@
 # Spec: GSAP Cascade Animation Engine
 
 **Spec ID:** 13-cascade-animation-engine
-**Status:** ready-for-implementation
+**Status:** implemented
 **Created:** 2026-04-25
 **Depends on:** 03-frontend-scaffold, 08-frontend-plumbing
 

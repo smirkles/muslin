@@ -1,7 +1,7 @@
 # Spec: Swayback Cascade
 
 **Spec ID:** 14-swayback-cascade
-**Status:** ready-for-implementation
+**Status:** implemented
 **Created:** 2026-04-25
 **Depends on:** 01-pattern-svg-library, 06-pattern-registry
 

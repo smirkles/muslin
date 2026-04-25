@@ -1,7 +1,7 @@
 # Spec: Pattern Download (SVG + PDF)
 
 **Spec ID:** 17-pattern-download
-**Status:** ready-for-implementation
+**Status:** implemented
 **Created:** 2026-04-25
 **Depends on:** 10-pattern-grading, 14-swayback-cascade, 15-fba-cascade, 08-frontend-plumbing
 
