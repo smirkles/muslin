@@ -238,7 +238,6 @@ def _run_specialist(
     region: str,
     agent: DiagnosisAgent,
     images: list[bytes],
-    prompts_root: Path,
 ) -> SpecialistDiagnosis | Exception:
     """Run a single specialist agent (sync) and return result or caught exception.
 
@@ -249,7 +248,6 @@ def _run_specialist(
         region: Body region identifier (e.g. 'bust', 'waist_hip', 'back').
         agent: The DiagnosisAgent to call.
         images: List of raw image bytes to pass to the agent.
-        prompts_root: Root directory of prompt files.
 
     Returns:
         SpecialistDiagnosis on success, or the non-fatal Exception on failure.
@@ -305,11 +303,9 @@ async def run_diagnosis(
         AllSpecialistsFailedError: If all specialist agents fail.
         CoordinatorParseError: If the coordinator returns an unparseable response.
     """
-    prompts_root = _PROMPTS_ROOT
-
     # Fan out three specialists concurrently
     specialist_tasks = [
-        asyncio.to_thread(_run_specialist, region, agent_factory(), images, prompts_root)
+        asyncio.to_thread(_run_specialist, region, agent_factory(), images)
         for region in _SPECIALIST_REGIONS
     ]
     outcomes = await asyncio.gather(*specialist_tasks)

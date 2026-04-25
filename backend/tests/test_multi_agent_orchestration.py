@@ -270,6 +270,18 @@ class TestRunDiagnosisPartialFailure:
         # Warning logged naming the failed region
         assert any("bust" in record.message for record in caplog.records)
 
+        # Coordinator received only survivors — bust must be absent from its input
+        coordinator_call = mock_agent.run.call_args_list[3]
+        coordinator_variables = (
+            coordinator_call[0][1]
+            if coordinator_call[0]
+            else coordinator_call[1].get("variables", {})
+        )
+        coordinator_specialist_outputs = coordinator_variables.get("specialist_outputs", "")
+        assert "bust" not in coordinator_specialist_outputs  # failed specialist excluded
+        assert "waist_hip" in coordinator_specialist_outputs  # survivor present
+        assert "back" in coordinator_specialist_outputs  # survivor present
+
     async def test_one_specialist_fails_warning_names_region(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ) -> None:
