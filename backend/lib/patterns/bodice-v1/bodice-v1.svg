@@ -1,9 +1,68 @@
 <?xml version="1.0" encoding="utf-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 600" width="400" height="600">
+<!--
+  Bodice-v1 pattern — coordinate system:
+  - Front piece: x=10..200 (CF at x=10, side seam at x=200)
+  - Back piece:  x=210..390 (CB at x=210, side seam at x=390)
+  - Waist line:  y=160
+  - Hem:         y=290
+  - Armhole:     y=10..60
+  - PX_PER_CM = 5 (1 cm = 5 SVG units)
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" width="400" height="300">
+
+  <!-- FRONT BODICE PIECES -->
   <g id="front-bodice">
-    <rect x="10" y="10" width="180" height="280" fill="none" stroke="black" stroke-width="2"/>
+    <!-- Centre-front panel: narrow panel from CF to bust column (x=10..115) -->
+    <polygon id="front-cf-panel"
+      points="10,10 115,10 115,290 10,290"
+      fill="none" stroke="black" stroke-width="1.5"/>
+
+    <!-- Side panel: from bust column to side seam (x=115..200) -->
+    <polygon id="front-side-panel"
+      points="115,10 200,10 200,290 115,290"
+      fill="none" stroke="black" stroke-width="1.5"/>
+
+    <!-- Waist dart placeholder (zero-width, at bust column) -->
+    <polygon id="front-waist-dart"
+      points="115,152 115,152 115,152"
+      fill="black" stroke="black" stroke-width="1"/>
   </g>
+
+  <!-- BACK BODICE PIECES -->
   <g id="back-bodice">
-    <rect x="210" y="10" width="180" height="280" fill="none" stroke="black" stroke-width="2"/>
+    <!-- Upper back: from CB to side seam, shoulder to waist (y=10..160) -->
+    <polygon id="back-piece-upper"
+      points="210,10 390,10 390,160 210,160"
+      fill="none" stroke="black" stroke-width="1.5"/>
+
+    <!-- Lower back: from CB to side seam, waist to hem (y=160..290) -->
+    <polygon id="back-piece-lower"
+      points="210,160 390,160 390,290 210,290"
+      fill="none" stroke="black" stroke-width="1.5"/>
+
+    <!-- Centre-back seam: left edge of back piece (x=210, full height) -->
+    <path id="back-cb-seam"
+      d="M 210 10 L 210 290"
+      fill="none" stroke="black" stroke-width="1.5"/>
+
+    <!-- Side seam: right edge of back piece (x=390, full height) -->
+    <path id="back-side-seam"
+      d="M 390 10 L 390 290"
+      fill="none" stroke="black" stroke-width="1.5"/>
+
+    <!-- Waist seam: horizontal at y=160 (CB to side seam) -->
+    <path id="back-waist-seam"
+      d="M 210 160 L 390 160"
+      fill="none" stroke="black" stroke-width="1"/>
+
+    <!-- Reference seams (invisible — used for seam truing comparison) -->
+    <path id="back-cb-seam-reference"
+      d="M 210 10 L 210 290"
+      stroke="none" display="none"/>
+
+    <path id="back-side-seam-reference"
+      d="M 390 10 L 390 290"
+      stroke="none" display="none"/>
   </g>
+
 </svg>
