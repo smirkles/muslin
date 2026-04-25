@@ -69,13 +69,13 @@ class TestSwaybackRoute:
         )
         assert response.status_code == 404
 
-    def test_unknown_adjustment_type_returns_400(self) -> None:
-        """Unknown adjustment_type returns 400."""
+    def test_unknown_adjustment_type_returns_422(self) -> None:
+        """Unknown adjustment_type returns 422."""
         response = client.post(
             "/cascades/apply-adjustment",
             json={"pattern_id": "bodice-v1", "adjustment_type": "unknown", "amount_cm": 1.5},
         )
-        assert response.status_code == 400
+        assert response.status_code == 422
 
     def test_steps_have_required_fields(self) -> None:
         """Each step has step_number, narration, and svg fields."""

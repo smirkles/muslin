@@ -11,6 +11,7 @@ Reference: docs/specs/15-fba-cascade.md
 
 from __future__ import annotations
 
+from lib.cascade.prompts import load_narration
 from lib.cascade.types import CascadeResult, CascadeScript, CascadeStep
 from lib.pattern_ops import Pattern, add_dart, render_pattern, slash_line, translate_element
 
@@ -70,6 +71,8 @@ def apply_fba(
     # Convert cm to SVG user units (1 cm = 5 px at bodice-v1 scale)
     fba_px = fba_amount_cm * _PX_PER_CM
 
+    narration = load_narration("fba")
+
     steps: list[CascadeStep] = []
 
     # ------------------------------------------------------------------
@@ -79,7 +82,7 @@ def apply_fba(
     steps.append(
         CascadeStep(
             step_number=1,
-            narration="Starting with your size-graded bodice block.",
+            narration=narration["step_1_intro"],
             svg=render_pattern(p),
         )
     )
@@ -96,10 +99,7 @@ def apply_fba(
     steps.append(
         CascadeStep(
             step_number=2,
-            narration=(
-                "We draw a slash line from the bust point to the hem — "
-                "this is where we'll open the pattern."
-            ),
+            narration=narration["step_2_slash_line"],
             svg=render_pattern(p),
         )
     )
@@ -114,7 +114,7 @@ def apply_fba(
     steps.append(
         CascadeStep(
             step_number=3,
-            narration=(f"Opening the slash by {fba_amount_cm} cm creates room for your full bust."),
+            narration=narration["step_3_open_slash"].format(amount_cm=fba_amount_cm),
             svg=render_pattern(p),
         )
     )
@@ -136,10 +136,7 @@ def apply_fba(
     steps.append(
         CascadeStep(
             step_number=4,
-            narration=(
-                "A new bust dart at the side seam takes in the extra fabric. "
-                "Your adjusted front bodice is ready."
-            ),
+            narration=narration["step_4_bust_dart"],
             svg=render_pattern(p),
         )
     )

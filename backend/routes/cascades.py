@@ -45,7 +45,7 @@ def apply_adjustment(req: ApplyAdjustmentRequest) -> CascadeScriptResponse:
     # Validate adjustment type
     if req.adjustment_type not in ADJUSTMENTS:
         raise HTTPException(
-            status_code=400,
+            status_code=422,
             detail=f"Unknown adjustment type: '{req.adjustment_type}'",
         )
 

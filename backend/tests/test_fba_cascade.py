@@ -386,18 +386,13 @@ class TestFbaRoute:
         )
         assert response.status_code == 404
 
-    def test_unsupported_adjustment_type_returns_400(self) -> None:
-        """Unsupported adjustment_type returns HTTP 400.
-
-        Note: The spec says 422, but the existing route returns 400 for unknown
-        adjustment types. We keep 400 to avoid breaking existing swayback tests.
-        See implementation notes in spec 15.
-        """
+    def test_unsupported_adjustment_type_returns_422(self) -> None:
+        """Unsupported adjustment_type returns HTTP 422."""
         response = self._client().post(
             "/cascades/apply-adjustment",
             json={"pattern_id": "bodice-v1", "adjustment_type": "unsupported", "amount_cm": 2.5},
         )
-        assert response.status_code == 400
+        assert response.status_code == 422
 
     def test_response_adjustment_type_is_fba(self) -> None:
         """Response adjustment_type is 'fba'."""
