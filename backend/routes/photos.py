@@ -1,23 +1,27 @@
-"""Photos route — POST /photos/upload.
+"""Photos route — POST /photos/upload and POST /photos/{photo_id}/segment.
 
 Thin handler: validate all files, store all, return records.
-All business logic lives in lib/photos/.
+All business logic lives in lib/photos/ and lib/segmentation/.
 """
 
+import logging
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Body, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from lib.measurements import get_measurements
-from lib.photos.store import store_photo
+from lib.photos.store import lookup_photo_by_id, store_photo
 from lib.photos.validate import (
     PhotoInvalidTypeError,
     PhotoTooLargeError,
     validate_photo,
 )
+from lib.segmentation.replicate_segmenter import ReplicateSegmenter
+from lib.segmentation.segmenter import ConfigError
 
+logger = logging.getLogger(__name__)
 router = APIRouter(tags=["photos"])
 
 VALID_LABELS = {"front", "back", "side"}
@@ -106,3 +110,70 @@ def _get_extension(filename: str) -> str:
     if dot_pos == -1:
         return ".jpg"
     return filename[dot_pos:].lower()
+
+
+# ---------------------------------------------------------------------------
+# Segmentation models
+# ---------------------------------------------------------------------------
+
+
+class SegmentRequest(BaseModel):
+    """Optional request body for POST /photos/{photo_id}/segment."""
+
+    point_prompt: list[float] | None = None
+
+
+class SegmentResponse(BaseModel):
+    """Response body for POST /photos/{photo_id}/segment."""
+
+    photo_id: str
+    mask_path: str
+    cropped_path: str
+    confidence: float
+
+
+def get_segmenter() -> ReplicateSegmenter:
+    """Return the segmenter instance used by the segment endpoint.
+
+    Extracted so tests can patch it cleanly.
+    """
+    return ReplicateSegmenter()
+
+
+@router.post("/photos/{photo_id}/segment", response_model=SegmentResponse)
+def segment_photo(
+    photo_id: str,
+    body: Annotated[SegmentRequest | None, Body()] = None,
+) -> SegmentResponse:
+    """Segment the muslin garment from a previously uploaded photo.
+
+    Errors:
+        404 — photo_id not found in temp storage.
+        500 — REPLICATE_API_TOKEN is missing from the environment.
+        502 — Replicate SDK raised an error.
+    """
+    try:
+        photo_path = lookup_photo_by_id(photo_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Photo not found") from exc
+
+    point: tuple[float, float] | None = None
+    if body and body.point_prompt is not None:
+        point = (body.point_prompt[0], body.point_prompt[1])
+
+    segmenter = get_segmenter()
+    try:
+        result = segmenter.segment(photo_path, point_prompt=point)
+    except ConfigError as exc:
+        logger.warning("REPLICATE_API_TOKEN not configured: %s", exc)
+        raise HTTPException(status_code=500, detail="REPLICATE_API_TOKEN not configured") from exc
+    except Exception as exc:
+        logger.exception("Replicate segmentation error for photo_id=%s: %s", photo_id, exc)
+        raise HTTPException(status_code=502, detail="Segmentation service error") from exc
+
+    return SegmentResponse(
+        photo_id=result.photo_id,
+        mask_path=str(result.mask_path),
+        cropped_path=str(result.cropped_path),
+        confidence=result.confidence,
+    )

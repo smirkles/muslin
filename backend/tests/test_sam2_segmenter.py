@@ -10,7 +10,6 @@ from PIL import Image
 
 from lib.segmentation.segmenter import ConfigError, SegmentationResult
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -218,9 +217,9 @@ class TestImportHygiene:
         lib_dir = Path(__file__).parent.parent / "lib" / "segmentation"
         for py_file in lib_dir.rglob("*.py"):
             content = py_file.read_text()
-            assert "fastapi" not in content, (
-                f"{py_file.name} imports fastapi — lib/ must have no HTTP framework imports"
-            )
+            assert (
+                "fastapi" not in content
+            ), f"{py_file.name} imports fastapi — lib/ must have no HTTP framework imports"
 
 
 # ---------------------------------------------------------------------------
