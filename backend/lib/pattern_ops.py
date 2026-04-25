@@ -948,6 +948,161 @@ def _scale_element(
             _scale_element(child, sx, sy, pivot)
 
 
+def _cubic_bezier_arc_length(
+    p0: tuple[float, float],
+    p1: tuple[float, float],
+    p2: tuple[float, float],
+    p3: tuple[float, float],
+    n: int = 32,
+) -> float:
+    """Approximate arc length of a cubic Bezier via uniform chord subdivision.
+
+    n=32 gives < 0.1% error for typical sewing-pattern curves (< 0.5 mm at scale).
+    """
+    t = np.linspace(0.0, 1.0, n + 1)
+    s = 1.0 - t
+    pts = (
+        (s**3)[:, None] * np.array(p0, dtype=float)
+        + (3 * s**2 * t)[:, None] * np.array(p1, dtype=float)
+        + (3 * s * t**2)[:, None] * np.array(p2, dtype=float)
+        + (t**3)[:, None] * np.array(p3, dtype=float)
+    )
+    return float(np.sum(np.linalg.norm(np.diff(pts, axis=0), axis=1)))
+
+
+def _quadratic_bezier_arc_length(
+    p0: tuple[float, float],
+    p1: tuple[float, float],
+    p2: tuple[float, float],
+    n: int = 32,
+) -> float:
+    """Approximate arc length of a quadratic Bezier via uniform chord subdivision.
+
+    n=32 gives < 0.1% error for typical sewing-pattern curves.
+    """
+    t = np.linspace(0.0, 1.0, n + 1)
+    s = 1.0 - t
+    pts = (
+        (s**2)[:, None] * np.array(p0, dtype=float)
+        + (2 * s * t)[:, None] * np.array(p1, dtype=float)
+        + (t**2)[:, None] * np.array(p2, dtype=float)
+    )
+    return float(np.sum(np.linalg.norm(np.diff(pts, axis=0), axis=1)))
+
+
+def _path_segment_lengths(d: str) -> tuple[list[tuple[float, float]], list[float]]:
+    """Return (anchor_endpoints, segment_arc_lengths) for a path.
+
+    anchor_endpoints[i] is the on-curve endpoint of segment i.
+    segment_arc_lengths[i] is the arc length of segment i:
+      - 0.0 for the initial M command (pen move, no arc traversed)
+      - Euclidean distance for L and implicit-L pairs within M
+      - de Casteljau chord-sum for C and S (smooth cubic)
+      - de Casteljau chord-sum for Q (quadratic)
+      - Straight chord for A and T (documented limitation)
+
+    The lists are parallel: anchors[i] and seg_lengths[i] correspond to the
+    same command repetition.  cumulative_sum(seg_lengths[:i+1]) gives the arc
+    length from path start to anchors[i].
+    """
+    d_norm = _transform_path_coords(d, lambda x, y: (x, y))
+    commands = _parse_path_d(d_norm)
+
+    _STRIDE: dict[str, int] = {"M": 1, "L": 1, "C": 3, "S": 2, "Q": 2, "T": 1}
+    _EP: dict[str, int] = {"M": 0, "L": 0, "C": 2, "S": 1, "Q": 1, "T": 0}
+
+    anchors: list[tuple[float, float]] = []
+    seg_lengths: list[float] = []
+    pen_x, pen_y = 0.0, 0.0
+    prev_c2: tuple[float, float] | None = None  # second ctrl-pt of prev C or S (for S)
+    is_first_m = True
+
+    for cmd, nums in commands:
+        upper = cmd.upper()
+
+        if upper == "Z":
+            prev_c2 = None
+            continue
+
+        if upper == "A":
+            # A: rx ry x-rotation large-arc-flag sweep-flag x y (7 params per arc)
+            # Straight chord approximation — elliptic arc length requires numerical
+            # integration beyond V1 scope; treat as chord and document the limitation.
+            j = 0
+            while j + 6 < len(nums):
+                ep_x, ep_y = nums[j + 5], nums[j + 6]
+                seg_len = float(np.linalg.norm([ep_x - pen_x, ep_y - pen_y]))
+                anchors.append((ep_x, ep_y))
+                seg_lengths.append(seg_len)
+                pen_x, pen_y = ep_x, ep_y
+                j += 7
+            prev_c2 = None
+            continue
+
+        if upper not in _STRIDE:
+            continue
+
+        stride = _STRIDE[upper]
+        ep = _EP[upper]
+        stride_floats = stride * 2
+        i = 0
+
+        while i + ep * 2 + 1 < len(nums):
+            ep_x = nums[i + ep * 2]
+            ep_y = nums[i + ep * 2 + 1]
+
+            if upper == "M":
+                # First M pair: pure pen move (seg_len = 0).
+                # Subsequent M pairs: SVG spec treats them as implicit lineto.
+                seg_len = (
+                    0.0
+                    if (is_first_m and i == 0)
+                    else float(np.linalg.norm([ep_x - pen_x, ep_y - pen_y]))
+                )
+                prev_c2 = None
+
+            elif upper == "L":
+                seg_len = float(np.linalg.norm([ep_x - pen_x, ep_y - pen_y]))
+                prev_c2 = None
+
+            elif upper == "C":
+                c1 = (nums[i], nums[i + 1])
+                c2 = (nums[i + 2], nums[i + 3])
+                seg_len = _cubic_bezier_arc_length((pen_x, pen_y), c1, c2, (ep_x, ep_y))
+                prev_c2 = c2
+
+            elif upper == "S":
+                # Smooth cubic: implied c1 = reflection of prev C/S ctrl-pt over pen.
+                # If no previous C/S, c1 = pen (degenerate — equivalent to a Q curve).
+                c1 = (
+                    (2 * pen_x - prev_c2[0], 2 * pen_y - prev_c2[1])
+                    if prev_c2 is not None
+                    else (pen_x, pen_y)
+                )
+                c2 = (nums[i], nums[i + 1])
+                seg_len = _cubic_bezier_arc_length((pen_x, pen_y), c1, c2, (ep_x, ep_y))
+                prev_c2 = c2
+
+            elif upper == "Q":
+                qc = (nums[i], nums[i + 1])
+                seg_len = _quadratic_bezier_arc_length((pen_x, pen_y), qc, (ep_x, ep_y))
+                prev_c2 = None
+
+            else:
+                # T (smooth quadratic): straight chord, documented limitation.
+                seg_len = float(np.linalg.norm([ep_x - pen_x, ep_y - pen_y]))
+                prev_c2 = None
+
+            anchors.append((ep_x, ep_y))
+            seg_lengths.append(seg_len)
+            pen_x, pen_y = ep_x, ep_y
+            i += stride_floats
+
+        is_first_m = False
+
+    return anchors, seg_lengths
+
+
 def _path_anchor_points(d: str) -> list[tuple[float, float]]:
     """Return the on-curve anchor points of a path, normalised to absolute first.
 
@@ -982,46 +1137,46 @@ def _path_anchor_points(d: str) -> list[tuple[float, float]]:
 
 
 def _path_length(el: etree._Element) -> float:
-    """Return the polyline arc length of a path element.
+    """Return the arc length of a path element.
 
-    Arc length is the sum of Euclidean distances between consecutive on-curve
-    anchor points.  For Bezier commands only the segment endpoint is used
-    (chord-length approximation); full Bezier arc length is deferred to spec-10.
+    Uses Bezier arc length (de Casteljau chord-sum, n=32) for C, S, Q segments.
+    Straight-chord approximation for A and T (documented limitation).
 
     Raises GeometryError if the path has fewer than 2 anchor points.
     """
-    anchors = _path_anchor_points(el.get("d", ""))
+    anchors, seg_lengths = _path_segment_lengths(el.get("d", ""))
     if len(anchors) < 2:
         raise GeometryError("Path has fewer than 2 coordinates; cannot measure length")
-    return sum(
-        float(np.linalg.norm(np.array(anchors[i + 1]) - np.array(anchors[i])))
-        for i in range(len(anchors) - 1)
-    )
+    return sum(seg_lengths)
 
 
 def _adjust_path_endpoint_length(el: etree._Element, target_length: float) -> None:
-    """Move the endpoint of a path in-place so its polyline arc length equals target_length.
+    """Move the endpoint of a path in-place so its arc length equals target_length.
 
     All intermediate anchor points are held fixed.  For extension, the last
     segment is lengthened in its own direction.  For shortening, the path is
-    truncated at the correct arc position with the final point interpolated.
+    truncated at the correct arc position with the final point interpolated
+    linearly between the segment's start and end anchors.
 
-    Chord-length approximation is used for Bezier segments (spec-10 will fix).
+    Uses Bezier arc length (de Casteljau) for C/S/Q segments.
     """
     d = el.get("d", "")
     # Normalise to absolute/uppercase so index arithmetic is straightforward
     d_norm = _transform_path_coords(d, lambda x, y: (x, y))
     commands = list(_parse_path_d(d_norm))
-    anchors = _path_anchor_points(d)
+    anchors, seg_lengths = _path_segment_lengths(d)
 
     if len(anchors) < 2:
         raise GeometryError("Path has fewer than 2 coordinates; cannot adjust length")
 
-    # Build cumulative arc lengths
-    cumulative = [0.0]
-    for i in range(1, len(anchors)):
-        seg = float(np.linalg.norm(np.array(anchors[i]) - np.array(anchors[i - 1])))
-        cumulative.append(cumulative[-1] + seg)
+    # Build cumulative arc lengths: cumulative[i] = arc length from path start to anchors[i].
+    # seg_lengths[0] = 0.0 (M command — pure pen move), so cumulative[0] = 0.0 and
+    # cumulative[i] = sum(seg_lengths[0..i]) which equals the arc to anchors[i].
+    cumulative = []
+    running = 0.0
+    for seg_len in seg_lengths:
+        running += seg_len
+        cumulative.append(running)
 
     total = cumulative[-1]
     if total < 1e-9:
