@@ -68,18 +68,18 @@ REPLICATE_SAM2_MODEL=meta/sam-2   # optional override; default hardcoded in segm
 
 ## Acceptance criteria
 
-- [ ] Given a valid photo path and no point prompt, when `ReplicateSegmenter().segment(photo_path)` is called with the Replicate client mocked, then `segment()` calls the client with model `meta/sam-2`, a single foreground point at `[0.5, 0.5]`, and the image encoded as base64.
-- [ ] Given a valid photo path and an explicit `point_prompt=(0.3, 0.7)`, when `segment()` is called, then the Replicate call uses `[0.3, 0.7]` as the point coordinates.
-- [ ] Given a mocked Replicate response with mask data and `iou_score=0.92`, when `segment()` returns, then `SegmentationResult.confidence == 0.92` and `mask_path` and `cropped_path` exist on disk.
-- [ ] Given `REPLICATE_API_TOKEN` is unset, when `segment()` is called, then `ConfigError` is raised with a message mentioning the env var name.
-- [ ] Given the Replicate client raises an exception, when `segment()` is called, then the exception propagates to the caller (not swallowed).
-- [ ] Given a valid `photo_id` with the Replicate client patched, when `POST /photos/{photo_id}/segment` is called, then the response is 200 with `photo_id`, `mask_path`, `cropped_path`, and `confidence` fields.
-- [ ] Given an unknown `photo_id`, when `POST /photos/{photo_id}/segment` is called, then the response is 404 with `detail="Photo not found"`.
-- [ ] Given `REPLICATE_API_TOKEN` is unset, when `POST /photos/{photo_id}/segment` is called, then the response is 500 with `detail="REPLICATE_API_TOKEN not configured"`.
-- [ ] Given the Replicate client raises an exception, when `POST /photos/{photo_id}/segment` is called, then the response is 502 with `detail="Segmentation service error"` and the original exception message is not in the response body.
-- [ ] `backend/lib/segmentation/` contains no imports from `fastapi` or any HTTP framework (enforced by import-hygiene test).
-- [ ] A live smoke test marked `@pytest.mark.integration` exists that, when `REPLICATE_API_TOKEN` is set, calls Replicate with a real test image and asserts a non-empty mask is returned. Skipped otherwise.
-- [ ] `uv run pytest` passes; `uv run ruff check . && uv run black --check .` exit 0.
+- [x] Given a valid photo path and no point prompt, when `ReplicateSegmenter().segment(photo_path)` is called with the Replicate client mocked, then `segment()` calls the client with model `meta/sam-2`, a single foreground point at `[0.5, 0.5]`, and the image encoded as base64.
+- [x] Given a valid photo path and an explicit `point_prompt=(0.3, 0.7)`, when `segment()` is called, then the Replicate call uses `[0.3, 0.7]` as the point coordinates.
+- [x] Given a mocked Replicate response with mask data and `iou_score=0.92`, when `segment()` returns, then `SegmentationResult.confidence == 0.92` and `mask_path` and `cropped_path` exist on disk.
+- [x] Given `REPLICATE_API_TOKEN` is unset, when `segment()` is called, then `ConfigError` is raised with a message mentioning the env var name.
+- [x] Given the Replicate client raises an exception, when `segment()` is called, then the exception propagates to the caller (not swallowed).
+- [x] Given a valid `photo_id` with the Replicate client patched, when `POST /photos/{photo_id}/segment` is called, then the response is 200 with `photo_id`, `mask_path`, `cropped_path`, and `confidence` fields.
+- [x] Given an unknown `photo_id`, when `POST /photos/{photo_id}/segment` is called, then the response is 404 with `detail="Photo not found"`.
+- [x] Given `REPLICATE_API_TOKEN` is unset, when `POST /photos/{photo_id}/segment` is called, then the response is 500 with `detail="REPLICATE_API_TOKEN not configured"`.
+- [x] Given the Replicate client raises an exception, when `POST /photos/{photo_id}/segment` is called, then the response is 502 with `detail="Segmentation service error"` and the original exception message is not in the response body.
+- [x] `backend/lib/segmentation/` contains no imports from `fastapi` or any HTTP framework (enforced by import-hygiene test).
+- [x] A live smoke test marked `@pytest.mark.integration` exists that, when `REPLICATE_API_TOKEN` is set, calls Replicate with a real test image and asserts a non-empty mask is returned. Skipped otherwise.
+- [x] `uv run pytest` passes; `uv run ruff check . && uv run black --check .` exit 0.
 
 ## Out of scope
 
