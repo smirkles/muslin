@@ -20,7 +20,7 @@ export function DiagnosisPanel() {
     if (!diagnosisResult && measurementsResponse && photoIds.length > 0) {
       runDiagnosis();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount-only: Zustand selectors are stable refs; re-running on every render would loop
   }, []);
 
   async function runDiagnosis() {
