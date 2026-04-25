@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Two-piece test pattern for grading tests.
+  bodice-front: x=10..110 (width=100), y=10..210 (height=200)
+  skirt-front:  x=10..110 (width=100), y=220..420 (height=200)
+
+  At PX_PER_CM = 5:
+    piece width  = 100px = 20 cm
+    piece height = 200px = 40 cm
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 450" width="200" height="450">
+
+  <!-- BODICE piece (id prefix: bodice-) -->
+  <g id="bodice-front">
+    <polygon id="bodice-front-rect"
+      points="10,10 110,10 110,210 10,210"
+      fill="none" stroke="black" stroke-width="1.5"/>
+  </g>
+
+  <!-- SKIRT piece (id prefix: skirt-) -->
+  <g id="skirt-front">
+    <polygon id="skirt-front-rect"
+      points="10,220 110,220 110,420 10,420"
+      fill="none" stroke="black" stroke-width="1.5"/>
+  </g>
+
+</svg>

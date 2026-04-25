@@ -21,7 +21,7 @@ REGISTRY
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from lib.pattern_ops import PatternError
@@ -49,13 +49,17 @@ class PatternMeta:
     description: str
     piece_count: int
     svg_path: Path  # resolved absolute path; not included in API responses
+    base_bust_cm: float | None = None
+    base_waist_cm: float | None = None
+    base_hip_cm: float | None = None
+    base_back_length_cm: float | None = None
 
 
 @dataclass
 class PatternDetail(PatternMeta):
     """Full pattern detail including SVG content (used for single-pattern responses)."""
 
-    svg: str  # raw SVG file contents as a string
+    svg: str = field(default="")  # raw SVG file contents; always set by get_pattern
 
 
 # ---------------------------------------------------------------------------
@@ -89,6 +93,10 @@ def build_registry(patterns_dir: Path) -> dict[str, PatternMeta]:
             description=raw["description"],
             piece_count=raw["piece_count"],
             svg_path=svg_path,
+            base_bust_cm=raw.get("base_bust_cm"),
+            base_waist_cm=raw.get("base_waist_cm"),
+            base_hip_cm=raw.get("base_hip_cm"),
+            base_back_length_cm=raw.get("base_back_length_cm"),
         )
         registry[meta.id] = meta
 

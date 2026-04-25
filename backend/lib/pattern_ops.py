@@ -383,6 +383,34 @@ def get_element(pattern: Pattern, element_id: str) -> etree._Element:
     return el
 
 
+def piece_ids(pattern: Pattern) -> list[str]:
+    """Return the ids of all direct <g> children of the SVG root.
+
+    Only top-level <g> elements are considered pieces.  Nested groups and
+    non-<g> elements at the root level are excluded.  Elements without an
+    id attribute are silently skipped.
+    """
+    root = pattern._tree.getroot()
+    result: list[str] = []
+    for child in root:
+        if child.tag in _G_TAGS:
+            eid = child.get("id")
+            if eid:
+                result.append(eid)
+    return result
+
+
+def element_bbox(
+    el: etree._Element,
+) -> tuple[float, float, float, float] | None:
+    """Return (min_x, min_y, max_x, max_y) bounding box of an element or <g> subtree.
+
+    Recursively gathers coordinates from all descendant elements.
+    Returns None if no coordinates can be extracted.
+    """
+    return _element_bbox(el)
+
+
 # ---------------------------------------------------------------------------
 # Element transformation helpers
 # ---------------------------------------------------------------------------
@@ -507,6 +535,33 @@ def rotate_element(
     new_pattern = pattern._deep_copy()
     el = new_pattern._id_index[element_id]
     _rotate_element(el, angle_deg, pivot)
+    return new_pattern
+
+
+def scale_element(
+    pattern: Pattern,
+    element_id: str,
+    sx: float,
+    sy: float,
+    pivot: tuple[float, float],
+) -> Pattern:
+    """Scale element ``element_id`` by (sx, sy) around ``pivot``; return a new Pattern.
+
+    The transform applied to each coordinate is:
+        x' = pivot_x + (x - pivot_x) * sx
+        y' = pivot_y + (y - pivot_y) * sy
+
+    For a <g> element, all descendants are scaled around the SAME pivot (the
+    pivot computed once at the piece level, not per-child bounding-box centres).
+
+    Raises ElementNotFound if element_id is not in the pattern.
+    """
+    if element_id not in pattern._id_index:
+        raise ElementNotFound(f"Element '{element_id}' not found in pattern")
+
+    new_pattern = pattern._deep_copy()
+    el = new_pattern._id_index[element_id]
+    _scale_element(el, sx, sy, pivot)
     return new_pattern
 
 
@@ -775,6 +830,114 @@ def _element_centroid(el: etree._Element) -> tuple[float, float] | None:
     xs = [c[0] for c in coords]
     ys = [c[1] for c in coords]
     return (sum(xs) / len(xs), sum(ys) / len(ys))
+
+
+def _element_bbox(
+    el: etree._Element,
+) -> tuple[float, float, float, float] | None:
+    """Return (min_x, min_y, max_x, max_y) bounding box of an element or <g> subtree.
+
+    Recursively gathers coordinates from all descendant elements.
+    Returns None if no coordinates can be extracted.
+    """
+    tag = el.tag
+    coords: list[tuple[float, float]] = []
+
+    if tag in _PATH_TAGS:
+        d = el.get("d", "")
+        if d:
+            # Normalise relative commands to absolute before collecting
+            d_norm = _transform_path_coords(d, lambda x, y: (x, y))
+            commands = _parse_path_d(d_norm)
+            for cmd, nums in commands:
+                upper = cmd.upper()
+                if upper in ("Z",):
+                    continue
+                i = 0
+                while i + 1 < len(nums):
+                    coords.append((nums[i], nums[i + 1]))
+                    i += 2
+
+    elif tag in _POLYGON_TAGS:
+        pts_str = el.get("points", "")
+        if pts_str:
+            coords = _parse_polygon_points(pts_str)
+
+    elif tag in _LINE_TAGS:
+        x1 = float(el.get("x1", 0))
+        y1 = float(el.get("y1", 0))
+        x2 = float(el.get("x2", 0))
+        y2 = float(el.get("y2", 0))
+        coords = [(x1, y1), (x2, y2)]
+
+    elif tag in _TEXT_TAGS:
+        x = float(el.get("x", 0))
+        y = float(el.get("y", 0))
+        coords = [(x, y)]
+
+    elif tag in _G_TAGS:
+        # Recurse into all direct children, collecting their bboxes
+        for child in el:
+            child_bbox = _element_bbox(child)
+            if child_bbox is not None:
+                min_x, min_y, max_x, max_y = child_bbox
+                coords.extend([(min_x, min_y), (max_x, max_y)])
+
+    if not coords:
+        return None
+
+    xs = [c[0] for c in coords]
+    ys = [c[1] for c in coords]
+    return (min(xs), min(ys), max(xs), max(ys))
+
+
+def _scale_element(
+    el: etree._Element,
+    sx: float,
+    sy: float,
+    pivot: tuple[float, float],
+) -> None:
+    """Scale a single lxml element in-place around a pivot point.
+
+    Applies transform: (pivot_x + (x - pivot_x) * sx, pivot_y + (y - pivot_y) * sy).
+    Modifies the element directly — caller must be working on a deep copy.
+    All descendant elements in a <g> use the same pivot (not per-child bbox centres).
+    """
+    px, py = pivot
+
+    def scale_coord(x: float, y: float) -> tuple[float, float]:
+        return (px + (x - px) * sx, py + (y - py) * sy)
+
+    tag = el.tag
+
+    if tag in _PATH_TAGS:
+        d = el.get("d", "")
+        el.set("d", _transform_path_coords(d, scale_coord))
+
+    elif tag in _POLYGON_TAGS:
+        pts = _parse_polygon_points(el.get("points", ""))
+        scaled = [scale_coord(x, y) for x, y in pts]
+        el.set("points", _serialise_polygon_points(scaled))
+
+    elif tag in _LINE_TAGS:
+        for attr_x, attr_y in (("x1", "y1"), ("x2", "y2")):
+            x = float(el.get(attr_x, 0))
+            y = float(el.get(attr_y, 0))
+            x2, y2 = scale_coord(x, y)
+            el.set(attr_x, _format_coord(x2))
+            el.set(attr_y, _format_coord(y2))
+
+    elif tag in _TEXT_TAGS:
+        x = float(el.get("x", 0))
+        y = float(el.get("y", 0))
+        x2, y2 = scale_coord(x, y)
+        el.set("x", _format_coord(x2))
+        el.set("y", _format_coord(y2))
+
+    elif tag in _G_TAGS:
+        # Recurse into all direct children with the SAME pivot (not per-child)
+        for child in el:
+            _scale_element(child, sx, sy, pivot)
 
 
 def _path_anchor_points(d: str) -> list[tuple[float, float]]:

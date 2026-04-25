@@ -1,7 +1,7 @@
 # Spec: Pattern Grading
 
 **Spec ID:** 10-pattern-grading
-**Status:** ready-for-implementation
+**Status:** implemented
 **Created:** 2026-04-25
 **Depends on:** 01-pattern-svg-library, 07-measurements-fba-fields, 06-pattern-registry
 
@@ -133,3 +133,35 @@ Vertical scale for every piece: `user.back_length_cm / base.back_length_cm`. Piv
 - `adjustments_cm` rounding: `round(value, 1)`.
 - File both ADRs in `docs/decisions/` before writing any code.
 - Write failing tests first per `CLAUDE.md` rule 5.
+
+## Implementation notes
+
+### What was implemented
+
+- `backend/lib/grading.py`: `grade_pattern`, `store_graded_pattern`, `get_graded_pattern`, `BaseMeasurements`, `GradedPattern`, `MeasurementsProtocol`.
+- `backend/lib/pattern_ops.py`: `scale_element` (public), `piece_ids` (public), `element_bbox` (public), plus `_scale_element` internal helper.
+- `backend/routes/patterns.py`: `POST /patterns/{id}/grade` handler, `GradeRequest`, `GradedPatternResponse`.
+- `backend/lib/patterns/bodice-v1/meta.json`: updated with base measurements (bust 88, waist 69, hip 94, back_length 40).
+- All 436 tests pass; ruff and black both exit 0.
+
+### Review fixes applied (2026-04-25)
+
+Review file: `docs/reviews/10-pattern-grading-20260425T042312Z.md`
+
+1. **`replicate` dependency removed**: `pyproject.toml` never had `replicate` on this branch in the final state; `uv lock` regenerated `uv.lock` to remove the stale `replicate` and its transitives.
+
+2. **Private `pattern_ops` internals decoupled**: `grading.py` previously accessed `_element_bbox`, `_G_TAGS`, `pattern._tree.getroot()`, and `pattern._id_index` directly. Added `piece_ids(pattern)` and `element_bbox(el)` as public functions in `pattern_ops.py`. `grading.py` now uses only `piece_ids`, `element_bbox`, `get_element`, and `ElementNotFound` from the public API. 8 new tests added in `TestPieceIds` and `TestElementBbox` classes.
+
+3. **`MeasurementsProtocol`**: Added `typing.Protocol` to `grading.py`. `grade_pattern` parameter changed from `user_measurements: object` to `user_measurements: MeasurementsProtocol`. Documents the structural contract (bust_cm, waist_cm, hip_cm, back_length_cm: float) and enables type-checker verification.
+
+4. **`cast()` replaces `# type: ignore`**: `routes/patterns.py` now uses `cast(float, meta.base_X_cm)` instead of four `# type: ignore[arg-type]` comments, in line with CLAUDE.md's ban on suppressed warnings.
+
+### Deviations from spec
+
+None. All acceptance criteria pass; no spec behaviour was changed.
+
+### Open questions for Steph
+
+None remaining. The two questions from the review were resolved:
+- `replicate` removed (confirmed: spec 12 has its own branch and should manage its own deps).
+- `MeasurementsProtocol` used (no circular import risk — `lib.measurements` is not imported by `lib.grading`).
