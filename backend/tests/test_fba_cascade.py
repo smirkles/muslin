@@ -119,9 +119,9 @@ class TestApplyFba:
         etree.fromstring(step1_svg.encode())
 
         assert _element_exists(step1_svg, "front-cf-panel"), "front-cf-panel missing from step 1"
-        assert _element_exists(step1_svg, "front-side-panel"), (
-            "front-side-panel missing from step 1"
-        )
+        assert _element_exists(
+            step1_svg, "front-side-panel"
+        ), "front-side-panel missing from step 1"
 
     def test_step2_svg_contains_slash_line(self) -> None:
         """Step 2 SVG contains a <line id='fba-slash-1'> element."""
@@ -131,9 +131,9 @@ class TestApplyFba:
         result = apply_fba(pattern, 2.5)
         step2_svg = result.cascade_script.steps[1].svg
 
-        assert _element_exists(step2_svg, "fba-slash-1"), (
-            "fba-slash-1 line element missing from step 2"
-        )
+        assert _element_exists(
+            step2_svg, "fba-slash-1"
+        ), "fba-slash-1 line element missing from step 2"
 
         el = _get_element(step2_svg, "fba-slash-1")
         tag = el.tag.split("}")[-1] if "}" in el.tag else el.tag
@@ -153,9 +153,9 @@ class TestApplyFba:
         cx3 = _polygon_centroid_x(result.cascade_script.steps[2].svg, "front-side-panel")
 
         actual_delta = cx3 - cx2
-        assert actual_delta == pytest.approx(fba_px, abs=1), (
-            f"front-side-panel centroid x delta {actual_delta:.2f} != expected {fba_px:.2f}"
-        )
+        assert actual_delta == pytest.approx(
+            fba_px, abs=1
+        ), f"front-side-panel centroid x delta {actual_delta:.2f} != expected {fba_px:.2f}"
 
     def test_step4_svg_contains_bust_dart_polygon(self) -> None:
         """Step 4 SVG contains a <polygon id='front-bust-dart'>."""
@@ -165,9 +165,9 @@ class TestApplyFba:
         result = apply_fba(pattern, 2.5)
         step4_svg = result.cascade_script.steps[3].svg
 
-        assert _element_exists(step4_svg, "front-bust-dart"), (
-            "front-bust-dart polygon missing from step 4"
-        )
+        assert _element_exists(
+            step4_svg, "front-bust-dart"
+        ), "front-bust-dart polygon missing from step 4"
 
         el = _get_element(step4_svg, "front-bust-dart")
         tag = el.tag.split("}")[-1] if "}" in el.tag else el.tag
@@ -183,9 +183,9 @@ class TestApplyFba:
         xs1 = _polygon_all_x(result.cascade_script.steps[0].svg, "front-cf-panel")
         xs4 = _polygon_all_x(result.cascade_script.steps[3].svg, "front-cf-panel")
 
-        assert xs1 == pytest.approx(xs4, abs=0.01), (
-            "front-cf-panel x-coordinates changed during FBA"
-        )
+        assert xs1 == pytest.approx(
+            xs4, abs=0.01
+        ), "front-cf-panel x-coordinates changed during FBA"
 
     def test_back_piece_upper_unchanged_between_step1_and_step4(self) -> None:
         """back-piece-upper x-coordinates are unchanged between steps 1 and 4."""
@@ -197,9 +197,9 @@ class TestApplyFba:
         xs1 = _polygon_all_x(result.cascade_script.steps[0].svg, "back-piece-upper")
         xs4 = _polygon_all_x(result.cascade_script.steps[3].svg, "back-piece-upper")
 
-        assert xs1 == pytest.approx(xs4, abs=0.01), (
-            "back-piece-upper x-coordinates changed during FBA (should only affect front)"
-        )
+        assert xs1 == pytest.approx(
+            xs4, abs=0.01
+        ), "back-piece-upper x-coordinates changed during FBA (should only affect front)"
 
     def test_back_piece_lower_unchanged_between_step1_and_step4(self) -> None:
         """back-piece-lower x-coordinates are unchanged between steps 1 and 4."""
@@ -211,9 +211,9 @@ class TestApplyFba:
         xs1 = _polygon_all_x(result.cascade_script.steps[0].svg, "back-piece-lower")
         xs4 = _polygon_all_x(result.cascade_script.steps[3].svg, "back-piece-lower")
 
-        assert xs1 == pytest.approx(xs4, abs=0.01), (
-            "back-piece-lower x-coordinates changed during FBA (should only affect front)"
-        )
+        assert xs1 == pytest.approx(
+            xs4, abs=0.01
+        ), "back-piece-lower x-coordinates changed during FBA (should only affect front)"
 
     def test_input_pattern_not_mutated(self) -> None:
         """apply_fba does not mutate the input pattern."""
@@ -304,9 +304,9 @@ class TestApplyFba:
         xs = [float(p[0]) for p in pairs if len(p) == 2]
 
         # The tip (first point) should be at expected_tip_x
-        assert xs[0] == pytest.approx(expected_tip_x, abs=1), (
-            f"Dart tip x {xs[0]:.2f} not near expected {expected_tip_x:.2f}"
-        )
+        assert xs[0] == pytest.approx(
+            expected_tip_x, abs=1
+        ), f"Dart tip x {xs[0]:.2f} not near expected {expected_tip_x:.2f}"
 
     def test_boundary_amount_min_is_valid(self) -> None:
         """amount_cm=0.5 (boundary) does not raise."""
