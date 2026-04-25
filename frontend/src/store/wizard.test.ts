@@ -24,9 +24,9 @@ describe("useWizardStore", () => {
     expect(state.measurementsResponse).toBeNull();
   });
 
-  it("has patternId as null in initial state", () => {
+  it("has patternId pre-loaded to the hackathon pattern in initial state", () => {
     const state = useWizardStore.getState();
-    expect(state.patternId).toBeNull();
+    expect(state.patternId).toBe("bodice-classic");
   });
 
   it("setMeasurementsResponse stores the response", () => {
@@ -40,10 +40,9 @@ describe("useWizardStore", () => {
     expect(useWizardStore.getState().measurementsResponse).toBeNull();
   });
 
-  it("reset clears patternId back to null", () => {
-    // Set some state and verify reset clears it
-    useWizardStore.getState().setMeasurementsResponse(MOCK_RESPONSE);
+  it("reset restores patternId to the pre-loaded hackathon pattern", () => {
+    useWizardStore.getState().setPatternId("some-other-pattern");
     useWizardStore.getState().reset();
-    expect(useWizardStore.getState().patternId).toBeNull();
+    expect(useWizardStore.getState().patternId).toBe("bodice-classic");
   });
 });
