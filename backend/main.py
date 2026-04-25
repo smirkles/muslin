@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from routes.body import router as body_router
 from routes.cascades import router as cascades_router
 from routes.dev import router as dev_router
+from routes.diagnosis import router as diagnosis_router
 from routes.measurements import router as measurements_router
 from routes.patterns import router as patterns_router
 from routes.photos import router as photos_router
@@ -38,3 +39,4 @@ app.include_router(patterns_router)
 app.include_router(photos_router)
 app.include_router(cascades_router)
 app.include_router(body_router)
+app.include_router(diagnosis_router)

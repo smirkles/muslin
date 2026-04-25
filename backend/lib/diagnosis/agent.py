@@ -41,12 +41,20 @@ class DiagnosisAgent(Protocol):
     today it's the direct Anthropic SDK; Day 3 it may be Managed Agents.
     """
 
-    def run(self, prompt_name: str, variables: dict[str, str]) -> AgentResponse:
+    def run(
+        self,
+        prompt_name: str,
+        variables: dict[str, str],
+        images: list[bytes] | None = None,
+        max_tokens: int = 256,
+    ) -> AgentResponse:
         """Run the agent with the named prompt and variable substitutions.
 
         Args:
             prompt_name: Name of the prompt directory under prompts/ (e.g. 'hello_world').
             variables: Key/value pairs to substitute into the prompt template.
+            images: Optional list of raw image bytes to attach as image content blocks.
+            max_tokens: Maximum number of tokens to generate. Defaults to 256.
 
         Returns:
             AgentResponse with the completion text and usage metadata.
