@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from routes.cascades import router as cascades_router
 from routes.dev import router as dev_router
 from routes.measurements import router as measurements_router
 from routes.patterns import router as patterns_router
@@ -34,3 +35,4 @@ if os.environ.get("APP_ENV") != "production":
 app.include_router(measurements_router)
 app.include_router(patterns_router)
 app.include_router(photos_router)
+app.include_router(cascades_router)
