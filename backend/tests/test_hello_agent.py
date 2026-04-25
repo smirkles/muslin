@@ -279,6 +279,139 @@ class TestAnthropicAgent:
 
 
 # ---------------------------------------------------------------------------
+# anthropic_agent.py — AnthropicAgent widened signature (spec 16)
+# ---------------------------------------------------------------------------
+
+
+class TestAnthropicAgentWidenedSignature:
+    """Tests for spec 16 additions: images and max_tokens arguments."""
+
+    def _make_mock_response(
+        self, text: str, input_tokens: int, output_tokens: int, model: str
+    ) -> MagicMock:
+        """Build a mock that resembles the anthropic SDK Message response."""
+        content_block = MagicMock()
+        content_block.text = text
+
+        usage = MagicMock()
+        usage.input_tokens = input_tokens
+        usage.output_tokens = output_tokens
+
+        msg = MagicMock()
+        msg.content = [content_block]
+        msg.usage = usage
+        msg.model = model
+        return msg
+
+    def test_images_produce_two_image_content_blocks(self, tmp_path: Path) -> None:
+        """When images=[bytes1, bytes2] are passed, the SDK call includes two type:'image' blocks."""
+        import base64
+
+        prompt_dir = tmp_path / "hello_world"
+        prompt_dir.mkdir()
+        (prompt_dir / "v1_baseline.md").write_text("Greet {{name}}.")
+
+        mock_response = self._make_mock_response(
+            text="Hi!", input_tokens=10, output_tokens=5, model="claude-opus-4-7"
+        )
+
+        bytes1 = b"\x89PNG\r\n\x1a\nfake_image_1"
+        bytes2 = b"\x89PNG\r\n\x1a\nfake_image_2"
+
+        with (
+            patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}),
+            patch("lib.diagnosis.anthropic_agent.anthropic.Anthropic") as mock_client_cls,
+        ):
+            mock_client = MagicMock()
+            mock_client_cls.return_value = mock_client
+            mock_client.messages.create.return_value = mock_response
+
+            from lib.diagnosis.anthropic_agent import AnthropicAgent
+
+            agent = AnthropicAgent(prompts_root=tmp_path)
+            agent.run("hello_world", {"name": "Steph"}, images=[bytes1, bytes2])
+
+        call_kwargs = mock_client.messages.create.call_args
+        messages = call_kwargs[1]["messages"] if call_kwargs[1] else call_kwargs[0][0]
+        # messages is a list; find the user message
+        user_message = next(m for m in messages if m["role"] == "user")
+        content = user_message["content"]
+
+        # Must be a list of blocks
+        assert isinstance(content, list)
+
+        # Count image blocks
+        image_blocks = [b for b in content if b.get("type") == "image"]
+        assert len(image_blocks) == 2
+
+        # Verify structure of each image block
+        for img_block, raw_bytes in zip(image_blocks, [bytes1, bytes2]):
+            assert img_block["type"] == "image"
+            source = img_block["source"]
+            assert source["type"] == "base64"
+            assert "media_type" in source
+            assert source["data"] == base64.b64encode(raw_bytes).decode()
+
+    def test_max_tokens_passed_to_sdk(self, tmp_path: Path) -> None:
+        """When max_tokens=4096 is passed, messages.create is called with max_tokens=4096."""
+        prompt_dir = tmp_path / "hello_world"
+        prompt_dir.mkdir()
+        (prompt_dir / "v1_baseline.md").write_text("Greet {{name}}.")
+
+        mock_response = self._make_mock_response(
+            text="Hi!", input_tokens=10, output_tokens=5, model="claude-opus-4-7"
+        )
+
+        with (
+            patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}),
+            patch("lib.diagnosis.anthropic_agent.anthropic.Anthropic") as mock_client_cls,
+        ):
+            mock_client = MagicMock()
+            mock_client_cls.return_value = mock_client
+            mock_client.messages.create.return_value = mock_response
+
+            from lib.diagnosis.anthropic_agent import AnthropicAgent
+
+            agent = AnthropicAgent(prompts_root=tmp_path)
+            agent.run("hello_world", {"name": "Steph"}, max_tokens=4096)
+
+        call_kwargs = mock_client.messages.create.call_args
+        actual_max_tokens = call_kwargs[1].get("max_tokens") or call_kwargs[0][1]
+        assert actual_max_tokens == 4096
+
+    def test_zero_image_callsite_still_works(self, tmp_path: Path) -> None:
+        """Calling run() without images (spec 09 callsite) continues to work."""
+        prompt_dir = tmp_path / "hello_world"
+        prompt_dir.mkdir()
+        (prompt_dir / "v1_baseline.md").write_text("Greet {{name}}.")
+
+        mock_response = self._make_mock_response(
+            text="Hi Steph!", input_tokens=10, output_tokens=5, model="claude-opus-4-7"
+        )
+
+        with (
+            patch.dict(os.environ, {"ANTHROPIC_API_KEY": "test-key"}),
+            patch("lib.diagnosis.anthropic_agent.anthropic.Anthropic") as mock_client_cls,
+        ):
+            mock_client = MagicMock()
+            mock_client_cls.return_value = mock_client
+            mock_client.messages.create.return_value = mock_response
+
+            from lib.diagnosis.anthropic_agent import AnthropicAgent
+
+            agent = AnthropicAgent(prompts_root=tmp_path)
+            result = agent.run("hello_world", {"name": "Steph"})
+
+        assert result.text == "Hi Steph!"
+        # Verify content is a plain string (no image blocks) for zero-image case
+        call_kwargs = mock_client.messages.create.call_args
+        messages = call_kwargs[1]["messages"] if call_kwargs[1] else call_kwargs[0][0]
+        user_message = next(m for m in messages if m["role"] == "user")
+        # Content should be a string (not a list of blocks) for backward compat
+        assert isinstance(user_message["content"], str)
+
+
+# ---------------------------------------------------------------------------
 # Import hygiene — lib/diagnosis must not import FastAPI
 # ---------------------------------------------------------------------------
 
