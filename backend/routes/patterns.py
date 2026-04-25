@@ -1,17 +1,24 @@
-"""Patterns route — GET /patterns, GET /patterns/{pattern_id}, POST /patterns/{pattern_id}/grade.
+"""Patterns route — GET /patterns, GET /patterns/{pattern_id},
+POST /patterns/{pattern_id}/grade, GET /patterns/download/{graded_pattern_id}.
 
 Thin handlers: delegate all logic to lib.pattern_registry and lib.grading.
 """
 
 from __future__ import annotations
 
-from typing import cast
+from dataclasses import dataclass
+from datetime import date
+from typing import Literal, cast
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
+from fastapi.responses import Response
 from pydantic import BaseModel
 
+from lib.export.pdf_export import build_pdf_download
+from lib.export.svg_export import build_svg_download
 from lib.grading import (
     BaseMeasurements,
+    get_graded_pattern,
     grade_pattern,
     store_graded_pattern,
 )
@@ -156,4 +163,68 @@ def grade_pattern_route(pattern_id: str, body: GradeRequest) -> GradedPatternRes
         measurement_id=graded.measurement_id,
         svg=graded.svg,
         adjustments_cm=graded.adjustments_cm,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Download route
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class _FallbackMeasurements:
+    """Minimal measurements used when session store has no record for a graded pattern."""
+
+    bust_cm: float = 0.0
+    waist_cm: float = 0.0
+    hip_cm: float = 0.0
+    back_length_cm: float = 0.0
+
+
+@router.get("/patterns/download/{graded_pattern_id}")
+def download_pattern(
+    graded_pattern_id: str,
+    format: Literal["svg", "pdf"] = Query(default="svg"),
+) -> Response:
+    """Download a graded pattern as SVG or print-ready PDF.
+
+    Errors:
+    - 404 if graded_pattern_id not in session store.
+    - 422 if format is not 'svg' or 'pdf'.
+    - 500 if PDF rendering fails.
+    """
+    try:
+        graded = get_graded_pattern(graded_pattern_id)
+    except KeyError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Pattern '{graded_pattern_id}' not found",
+        ) from exc
+
+    if format == "svg":
+        svg_content, filename = build_svg_download(graded)
+        return Response(
+            content=svg_content,
+            media_type="image/svg+xml",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+
+    # PDF
+    try:
+        measurements = get_measurements(graded.measurement_id)
+    except KeyError:
+        measurements = _FallbackMeasurements()  # type: ignore[assignment]
+
+    try:
+        pdf_bytes, filename = build_pdf_download(graded, measurements, date.today())
+    except Exception as exc:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to render PDF: {exc}",
+        ) from exc
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )

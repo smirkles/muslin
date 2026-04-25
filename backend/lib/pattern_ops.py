@@ -55,6 +55,7 @@ _POLYGON_TAGS = {f"{{{SVG_NS}}}polygon", "polygon"}
 _LINE_TAGS = {f"{{{SVG_NS}}}line", "line"}
 _TEXT_TAGS = {f"{{{SVG_NS}}}text", "text"}
 _G_TAGS = {f"{{{SVG_NS}}}g", "g"}
+_RECT_TAGS = {f"{{{SVG_NS}}}rect", "rect"}
 
 
 # ---------------------------------------------------------------------------
@@ -874,6 +875,13 @@ def _element_bbox(
         x = float(el.get("x", 0))
         y = float(el.get("y", 0))
         coords = [(x, y)]
+
+    elif tag in _RECT_TAGS:
+        x = float(el.get("x", 0))
+        y = float(el.get("y", 0))
+        w = float(el.get("width", 0))
+        h = float(el.get("height", 0))
+        coords = [(x, y), (x + w, y + h)]
 
     elif tag in _G_TAGS:
         # Recurse into all direct children, collecting their bboxes
