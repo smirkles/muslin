@@ -1,7 +1,7 @@
 # Spec: FBA Cascade Engine
 
 **Spec ID:** 15-fba-cascade
-**Status:** ready-for-implementation
+**Status:** implemented
 **Created:** 2026-04-24
 **Depends on:** 01-pattern-svg-library, 04-measurements-endpoint, 06-pattern-registry
 
@@ -56,7 +56,7 @@ class CascadeResult:
 
 These types are **the contract between backend cascade engines and the frontend player**. The frontend (spec 11) imports the JSON serialisation of `CascadeScript`. Do not change the field names without updating both sides.
 
-### `POST /apply-adjustment` endpoint
+### `POST /cascades/apply-adjustment` endpoint
 
 Request body:
 ```json
@@ -70,17 +70,16 @@ Request body:
 Response body (HTTP 200):
 ```json
 {
-  "cascade_script": {
-    "adjustment_type": "fba",
-    "pattern_id": "bodice-v1",
-    "amount_cm": 2.5,
-    "steps": [
-      { "step_number": 1, "narration": "...", "svg": "<?xml..." },
-      { "step_number": 2, "narration": "...", "svg": "<?xml..." },
-      { "step_number": 3, "narration": "...", "svg": "<?xml..." },
-      { "step_number": 4, "narration": "...", "svg": "<?xml..." }
-    ]
-  }
+  "adjustment_type": "fba",
+  "pattern_id": "bodice-v1",
+  "amount_cm": 2.5,
+  "steps": [
+    { "step_number": 1, "narration": "...", "svg": "<?xml..." },
+    { "step_number": 2, "narration": "...", "svg": "<?xml..." },
+    { "step_number": 3, "narration": "...", "svg": "<?xml..." },
+    { "step_number": 4, "narration": "...", "svg": "<?xml..." }
+  ],
+  "seam_adjustments": {}
 }
 ```
 
@@ -162,10 +161,10 @@ Register `adjustments.py` router in `main.py`.
 - [ ] `adjusted_pattern` is a new Pattern object; the input `pattern` is not mutated.
 - [ ] Given `amount_cm=0.4`, `apply_fba` raises `ValueError` with message containing "0.5".
 - [ ] Given `amount_cm=6.1`, `apply_fba` raises `ValueError` with message containing "6.0".
-- [ ] `POST /apply-adjustment` with `{"pattern_id":"bodice-v1","adjustment_type":"fba","amount_cm":2.5}` returns HTTP 200 with `cascade_script.steps` having length 4.
-- [ ] `POST /apply-adjustment` with `amount_cm=0.3` returns HTTP 422.
-- [ ] `POST /apply-adjustment` with `pattern_id="nonexistent"` returns HTTP 404.
-- [ ] `POST /apply-adjustment` with `adjustment_type="unsupported"` returns HTTP 422.
+- [ ] `POST /cascades/apply-adjustment` with `{"pattern_id":"bodice-v1","adjustment_type":"fba","amount_cm":2.5}` returns HTTP 200 with `steps` having length 4.
+- [ ] `POST /cascades/apply-adjustment` with `amount_cm=0.3` returns HTTP 422.
+- [ ] `POST /cascades/apply-adjustment` with `pattern_id="nonexistent"` returns HTTP 404.
+- [ ] `POST /cascades/apply-adjustment` with `adjustment_type="unsupported"` returns HTTP 422.
 
 ## Out of scope
 
@@ -206,3 +205,32 @@ Register `adjustments.py` router in `main.py`.
 - Do not hardcode narration text as a module-level constant — put the strings inline with the step construction so they're easy to tune later.
 - The `cascade/` directory is new; create `backend/lib/cascade/__init__.py` as an empty file.
 - Register the new router in `main.py` with `app.include_router(adjustments_router)`.
+
+## Implementation notes
+
+**Branch:** `feat/15-fba-cascade`
+
+### What was implemented
+
+- `backend/lib/cascade/fba.py` — `apply_fba()` function implementing the 4-step FBA cascade.
+- `backend/routes/cascades.py` — added `"fba": apply_fba` to the `ADJUSTMENTS` dispatch table.
+- `backend/tests/test_fba_cascade.py` — 29 tests (22 unit + 7 integration) covering all acceptance criteria.
+- All 392 backend tests pass. Ruff and black linters pass.
+
+### Review fixes (2026-04-25)
+
+1. **HTTP 400 → 422 for unknown `adjustment_type`.** Changed `routes/cascades.py` to return 422. Updated test names and assertions in `test_routes_cascades.py` (`test_unknown_adjustment_type_returns_422`) and `test_fba_cascade.py` (`test_unsupported_adjustment_type_returns_422`).
+
+2. **FBA narration moved to prompt file.** Created `prompts/fba/v1_baseline.md` with four sections (`step_1_intro`, `step_2_slash_line`, `step_3_open_slash`, `step_4_bust_dart`). Updated `backend/lib/cascade/fba.py` to import and use `load_narration("fba")`, matching the pattern established by `swayback.py`.
+
+3. **Spec doc corrected.** Updated `docs/specs/15-fba-cascade.md`: endpoint heading changed from `POST /apply-adjustment` to `POST /cascades/apply-adjustment`; acceptance criteria bullets updated to match; response example corrected to reflect actual flat response shape (no nested `cascade_script` wrapper).
+
+### Deviations from spec
+
+1. **No new `routes/adjustments.py` created.** The spec's File Layout section suggests a new `adjustments.py` router, but the explicit task instructions say to add `"fba": apply_fba` to the existing dispatch table in `routes/cascades.py`. This keeps the route at `/cascades/apply-adjustment` (already working) and avoids creating a parallel router. The user's task instructions override the spec layout.
+
+2. **`back-piece` element tested as `back-piece-upper` and `back-piece-lower`.** The spec says "back-piece x-coordinates unchanged" but no element named `back-piece` exists in the SVG — only `back-piece-upper` and `back-piece-lower`. Both are tested individually.
+
+3. **fba_px conversion uses `_PX_PER_CM = 5.0` (not `SCALE = 10.0`).** The spec formula `fba_amount_cm * 10 * 0.5 = fba_amount_cm * 5` equals `PX_PER_CM`, not the swayback `SCALE`. Using the correct value.
+
+4. **`seam_adjustments` is an empty dict `{}`.** Seam truing is explicitly out of scope for V1. The `CascadeScript` dataclass defaults to `{}`, so this is natural.

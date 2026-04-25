@@ -5,15 +5,17 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from lib.cascade.fba import apply_fba
 from lib.cascade.swayback import apply_swayback
 from lib.pattern_ops import ElementNotFound
 from lib.pattern_registry import REGISTRY, PatternNotFound, get_pattern
 
 router = APIRouter(prefix="/cascades", tags=["cascades"])
 
-# Dispatch table — spec 15 adds "fba": apply_fba
+# Dispatch table — spec 15 added "fba": apply_fba
 ADJUSTMENTS = {
     "swayback": apply_swayback,
+    "fba": apply_fba,
 }
 
 
@@ -43,7 +45,7 @@ def apply_adjustment(req: ApplyAdjustmentRequest) -> CascadeScriptResponse:
     # Validate adjustment type
     if req.adjustment_type not in ADJUSTMENTS:
         raise HTTPException(
-            status_code=400,
+            status_code=422,
             detail=f"Unknown adjustment type: '{req.adjustment_type}'",
         )
 
