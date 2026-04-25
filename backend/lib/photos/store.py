@@ -72,3 +72,34 @@ def resolve_photo_path(
             f"No photo found for measurement_id={measurement_id!r}, photo_id={photo_id!r}"
         )
     return matches[0]
+
+
+def lookup_photo_by_id(
+    photo_id: str,
+    *,
+    base_dir: Path | None = None,
+) -> Path:
+    """Find a stored photo by photo_id alone, searching all measurement directories.
+
+    Raises FileNotFoundError if no matching file exists.
+
+    Args:
+        photo_id: UUID4 of the photo to find.
+        base_dir: Override the default .tmp base directory (used in tests).
+
+    Returns:
+        Path to the stored photo file.
+
+    Raises:
+        FileNotFoundError: If no photo with that ID exists.
+    """
+    resolved_base = base_dir if base_dir is not None else _DEFAULT_BASE_DIR
+    photos_root = resolved_base / "photos"
+    if not photos_root.exists():
+        raise FileNotFoundError(f"No photo found for photo_id={photo_id!r}")
+    # Glob pattern matches UUID.ext but not UUID_mask.png or UUID_cropped.png
+    # because those live in a segmented/ subdirectory.
+    matches = list(photos_root.rglob(f"{photo_id}.*"))
+    if not matches:
+        raise FileNotFoundError(f"No photo found for photo_id={photo_id!r}")
+    return matches[0]
