@@ -3,9 +3,9 @@
 Tests use mocked agents. All non-integration tests pass without an API key.
 """
 
-import asyncio
 import logging
 import time
+from collections.abc import Callable
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -69,9 +69,8 @@ def _make_mock_agent(responses: list[str]) -> MagicMock:
     return agent
 
 
-def _make_agent_factory(agent: MagicMock) -> "Callable[[], MagicMock]":  # type: ignore[type-arg]
+def _make_agent_factory(agent: MagicMock) -> Callable[[], MagicMock]:  # type: ignore[type-arg]
     """Return a factory that always returns the given agent."""
-    from typing import Callable
 
     def factory() -> MagicMock:
         return agent
@@ -94,12 +93,15 @@ class TestRunDiagnosisHappyPath:
         back_json = _make_specialist_json("back", "swayback")
         coordinator_json = _make_coordinator_json("fba")
 
-        mock_agent = _make_mock_agent(
-            [bust_json, waist_json, back_json, coordinator_json]
-        )
+        mock_agent = _make_mock_agent([bust_json, waist_json, back_json, coordinator_json])
 
         # Set up prompt files in tmp_path
-        for subdir in ["diagnosis/bust", "diagnosis/waist_hip", "diagnosis/back", "diagnosis/coordinator"]:
+        for subdir in [
+            "diagnosis/bust",
+            "diagnosis/waist_hip",
+            "diagnosis/back",
+            "diagnosis/coordinator",
+        ]:
             (tmp_path / subdir).mkdir(parents=True, exist_ok=True)
         (tmp_path / "diagnosis/bust/v1_baseline.md").write_text("Analyze bust fit.")
         (tmp_path / "diagnosis/waist_hip/v1_baseline.md").write_text("Analyze waist/hip fit.")
@@ -127,11 +129,14 @@ class TestRunDiagnosisHappyPath:
         back_json = _make_specialist_json("back", "pooling")
         coordinator_json = _make_coordinator_json("fba")
 
-        mock_agent = _make_mock_agent(
-            [bust_json, waist_json, back_json, coordinator_json]
-        )
+        mock_agent = _make_mock_agent([bust_json, waist_json, back_json, coordinator_json])
 
-        for subdir in ["diagnosis/bust", "diagnosis/waist_hip", "diagnosis/back", "diagnosis/coordinator"]:
+        for subdir in [
+            "diagnosis/bust",
+            "diagnosis/waist_hip",
+            "diagnosis/back",
+            "diagnosis/coordinator",
+        ]:
             (tmp_path / subdir).mkdir(parents=True, exist_ok=True)
         (tmp_path / "diagnosis/bust/v1_baseline.md").write_text("Bust prompt.")
         (tmp_path / "diagnosis/waist_hip/v1_baseline.md").write_text("Waist/hip prompt.")
@@ -147,7 +152,11 @@ class TestRunDiagnosisHappyPath:
 
         # The 4th call (index 3) is the coordinator
         coordinator_call = mock_agent.run.call_args_list[3]
-        variables = coordinator_call[0][1] if coordinator_call[0] else coordinator_call[1].get("variables", {})
+        variables = (
+            coordinator_call[0][1]
+            if coordinator_call[0]
+            else coordinator_call[1].get("variables", {})
+        )
         specialist_outputs = variables.get("specialist_outputs", "")
         # All three regions should appear in the serialised JSON
         assert "bust" in specialist_outputs
@@ -161,16 +170,11 @@ class TestRunDiagnosisHappyPath:
 
 
 class TestRunDiagnosisConcurrency:
-    async def test_three_100ms_specialists_complete_under_200ms(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_three_100ms_specialists_complete_under_200ms(self, tmp_path: Path) -> None:
         """Three specialists each delayed 100 ms must complete in < 200 ms (proves gather concurrency)."""
-        import json
-
         from lib.diagnosis.multi_agent import run_diagnosis
 
         def slow_run(prompt_name: str, variables: dict, images=None, max_tokens: int = 256):
-            time.sleep(0.1)  # sync sleep — runs in thread via asyncio.to_thread
             region_map = {
                 "diagnosis/bust": "bust",
                 "diagnosis/waist_hip": "waist_hip",
@@ -180,13 +184,21 @@ class TestRunDiagnosisConcurrency:
             region = region_map.get(prompt_name, "bust")
 
             if region == "coordinator":
+                # Coordinator does not sleep — only specialists are delayed
                 return _make_agent_response(_make_coordinator_json("fba"))
+            # Each specialist sleeps 100ms (sync) — asyncio.to_thread must run them concurrently
+            time.sleep(0.1)
             return _make_agent_response(_make_specialist_json(region))
 
         slow_agent = MagicMock()
         slow_agent.run.side_effect = slow_run
 
-        for subdir in ["diagnosis/bust", "diagnosis/waist_hip", "diagnosis/back", "diagnosis/coordinator"]:
+        for subdir in [
+            "diagnosis/bust",
+            "diagnosis/waist_hip",
+            "diagnosis/back",
+            "diagnosis/coordinator",
+        ]:
             (tmp_path / subdir).mkdir(parents=True, exist_ok=True)
         (tmp_path / "diagnosis/bust/v1_baseline.md").write_text("Bust.")
         (tmp_path / "diagnosis/waist_hip/v1_baseline.md").write_text("Waist/hip.")
@@ -233,7 +245,12 @@ class TestRunDiagnosisPartialFailure:
         mock_agent = MagicMock()
         mock_agent.run.side_effect = failing_run
 
-        for subdir in ["diagnosis/bust", "diagnosis/waist_hip", "diagnosis/back", "diagnosis/coordinator"]:
+        for subdir in [
+            "diagnosis/bust",
+            "diagnosis/waist_hip",
+            "diagnosis/back",
+            "diagnosis/coordinator",
+        ]:
             (tmp_path / subdir).mkdir(parents=True, exist_ok=True)
         (tmp_path / "diagnosis/bust/v1_baseline.md").write_text("Bust.")
         (tmp_path / "diagnosis/waist_hip/v1_baseline.md").write_text("Waist/hip.")
@@ -271,7 +288,12 @@ class TestRunDiagnosisPartialFailure:
         mock_agent = MagicMock()
         mock_agent.run.side_effect = failing_run
 
-        for subdir in ["diagnosis/bust", "diagnosis/waist_hip", "diagnosis/back", "diagnosis/coordinator"]:
+        for subdir in [
+            "diagnosis/bust",
+            "diagnosis/waist_hip",
+            "diagnosis/back",
+            "diagnosis/coordinator",
+        ]:
             (tmp_path / subdir).mkdir(parents=True, exist_ok=True)
         (tmp_path / "diagnosis/bust/v1_baseline.md").write_text("Bust.")
         (tmp_path / "diagnosis/waist_hip/v1_baseline.md").write_text("Waist/hip.")
@@ -305,7 +327,12 @@ class TestRunDiagnosisTotalFailure:
         mock_agent = MagicMock()
         mock_agent.run.side_effect = RuntimeError("all fail")
 
-        for subdir in ["diagnosis/bust", "diagnosis/waist_hip", "diagnosis/back", "diagnosis/coordinator"]:
+        for subdir in [
+            "diagnosis/bust",
+            "diagnosis/waist_hip",
+            "diagnosis/back",
+            "diagnosis/coordinator",
+        ]:
             (tmp_path / subdir).mkdir(parents=True, exist_ok=True)
         (tmp_path / "diagnosis/bust/v1_baseline.md").write_text("Bust.")
         (tmp_path / "diagnosis/waist_hip/v1_baseline.md").write_text("Waist/hip.")
@@ -338,7 +365,12 @@ class TestRunDiagnosisCoordinatorError:
 
         mock_agent = _make_mock_agent([bust_json, waist_json, back_json, bad_coordinator])
 
-        for subdir in ["diagnosis/bust", "diagnosis/waist_hip", "diagnosis/back", "diagnosis/coordinator"]:
+        for subdir in [
+            "diagnosis/bust",
+            "diagnosis/waist_hip",
+            "diagnosis/back",
+            "diagnosis/coordinator",
+        ]:
             (tmp_path / subdir).mkdir(parents=True, exist_ok=True)
         (tmp_path / "diagnosis/bust/v1_baseline.md").write_text("Bust.")
         (tmp_path / "diagnosis/waist_hip/v1_baseline.md").write_text("Waist/hip.")

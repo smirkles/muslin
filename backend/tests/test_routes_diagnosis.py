@@ -8,7 +8,6 @@ import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
 from fastapi.testclient import TestClient
 
 # ---------------------------------------------------------------------------
@@ -226,8 +225,6 @@ class TestDiagnosisRunServiceError:
         crop_file = seg_dir / f"{photo_id}_cropped.png"
         crop_file.write_bytes(b"\x89PNG\r\n\x1a\nfake crop")
 
-        from lib.diagnosis.multi_agent import AllSpecialistsFailedError
-
         mock_agent = MagicMock()
         mock_agent.run.side_effect = RuntimeError("all fail")
 
@@ -262,9 +259,7 @@ class TestDiagnosisRunServiceError:
         bust_json = _make_specialist_json("bust")
         waist_json = _make_specialist_json("waist_hip")
         back_json = _make_specialist_json("back")
-        bad_coordinator = (
-            '{"issues": [], "primary_recommendation": "ok", "cascade_type": "banana"}'
-        )
+        bad_coordinator = '{"issues": [], "primary_recommendation": "ok", "cascade_type": "banana"}'
 
         mock_agent = MagicMock()
         mock_agent.run.side_effect = [

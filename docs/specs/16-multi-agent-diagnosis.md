@@ -1,7 +1,7 @@
 # Spec: Multi-Agent Fit Diagnosis
 
 **Spec ID:** 16-multi-agent-diagnosis
-**Status:** ready-for-implementation
+**Status:** implemented
 **Created:** 2026-04-25
 **Depends on:** 09-hello-world-managed-agent, 11-photo-upload, 12-sam2-segmentation
 
@@ -97,25 +97,25 @@ New `backend/routes/diagnosis.py` router.
 
 ## Acceptance criteria
 
-- [ ] Given `AnthropicAgent` called with `images=[bytes1, bytes2]`, the Anthropic SDK call includes two `type: "image"` content blocks with base64-encoded data.
-- [ ] Given `AnthropicAgent` called with `max_tokens=4096`, `messages.create(...)` is called with `max_tokens=4096`.
-- [ ] Existing hello-world callsite (`run("hello_world", {"name": "Steph"})` with no `images`) continues to pass — no spec 09 regressions.
-- [ ] Given valid JSON matching `SpecialistDiagnosis`, `_parse_specialist(region, text)` returns a correctly populated dataclass with `confidence` clamped to `[0.0, 1.0]`.
-- [ ] Given malformed JSON or missing required fields, `_parse_specialist` raises `SpecialistParseError` with the offending text in the message.
-- [ ] Given three successful specialists, the coordinator prompt is rendered with all three serialised in `{{specialist_outputs}}`.
-- [ ] Given three mocked specialists each with 100 ms delay, `run_diagnosis` completes in < 200 ms (proves concurrency).
-- [ ] Given one specialist fails and two succeed, the coordinator runs with the two survivors and a warning is logged naming the failed region.
-- [ ] Given all three specialists fail, `AllSpecialistsFailedError` is raised.
-- [ ] Given coordinator returns `cascade_type: "banana"`, `CoordinatorParseError` is raised.
-- [ ] Given valid request with `get_agent` patched to return canned outputs, `POST /diagnosis/run` returns 200 with `DiagnosisResult` shape.
-- [ ] Unknown `measurement_id` → 404 with `detail="Photo not found"`.
-- [ ] `photo_id` with no segmented crop → 404 with `detail="Photo not found"`.
-- [ ] `ANTHROPIC_API_KEY` unset → 500 with `detail="ANTHROPIC_API_KEY not configured"`.
-- [ ] `AllSpecialistsFailedError` raised → 502 with `detail="Diagnosis service error"`.
-- [ ] `photo_ids=[]` or length > 3 → 422.
-- [ ] `backend/lib/diagnosis/` (including `multi_agent.py`) has no `fastapi` imports (import-hygiene test extended).
-- [ ] Live smoke test `@pytest.mark.integration` — when `ANTHROPIC_API_KEY` set, runs full pipeline against a fixture segmented crop and asserts `cascade_type ∈ {"fba","swayback","none"}`. Skipped otherwise.
-- [ ] `uv run pytest` passes; `uv run ruff check . && uv run black --check .` exit 0.
+- [x] Given `AnthropicAgent` called with `images=[bytes1, bytes2]`, the Anthropic SDK call includes two `type: "image"` content blocks with base64-encoded data.
+- [x] Given `AnthropicAgent` called with `max_tokens=4096`, `messages.create(...)` is called with `max_tokens=4096`.
+- [x] Existing hello-world callsite (`run("hello_world", {"name": "Steph"})` with no `images`) continues to pass — no spec 09 regressions.
+- [x] Given valid JSON matching `SpecialistDiagnosis`, `_parse_specialist(region, text)` returns a correctly populated dataclass with `confidence` clamped to `[0.0, 1.0]`.
+- [x] Given malformed JSON or missing required fields, `_parse_specialist` raises `SpecialistParseError` with the offending text in the message.
+- [x] Given three successful specialists, the coordinator prompt is rendered with all three serialised in `{{specialist_outputs}}`.
+- [x] Given three mocked specialists each with 100 ms delay, `run_diagnosis` completes in < 200 ms (proves concurrency).
+- [x] Given one specialist fails and two succeed, the coordinator runs with the two survivors and a warning is logged naming the failed region.
+- [x] Given all three specialists fail, `AllSpecialistsFailedError` is raised.
+- [x] Given coordinator returns `cascade_type: "banana"`, `CoordinatorParseError` is raised.
+- [x] Given valid request with `get_agent` patched to return canned outputs, `POST /diagnosis/run` returns 200 with `DiagnosisResult` shape.
+- [x] Unknown `measurement_id` → 404 with `detail="Photo not found"`.
+- [x] `photo_id` with no segmented crop → 404 with `detail="Photo not found"`.
+- [x] `ANTHROPIC_API_KEY` unset → 500 with `detail="ANTHROPIC_API_KEY not configured"`.
+- [x] `AllSpecialistsFailedError` raised → 502 with `detail="Diagnosis service error"`.
+- [x] `photo_ids=[]` or length > 3 → 422.
+- [x] `backend/lib/diagnosis/` (including `multi_agent.py`) has no `fastapi` imports (import-hygiene test extended).
+- [x] Live smoke test `@pytest.mark.integration` — when `ANTHROPIC_API_KEY` set, runs full pipeline against a fixture segmented crop and asserts `cascade_type ∈ {"fba","swayback","none"}`. Skipped otherwise.
+- [x] `uv run pytest` passes; `uv run ruff check . && uv run black --check .` exit 0.
 
 ## Out of scope
 
@@ -170,3 +170,29 @@ New `backend/routes/diagnosis.py` router.
 - Base64-encode each image exactly once in the orchestrator.
 - If coordinator returns `cascade_type` outside the closed set, treat as parse error (502), never silently coerce to `"none"`.
 - Fixture segmented crop for integration test: use a photo staged to reliably trigger one cascade type.
+
+## Implementation notes
+
+### What was implemented
+
+- `backend/lib/diagnosis/multi_agent.py` — full orchestrator with dataclasses (`Issue`, `SpecialistDiagnosis`, `DiagnosisResult`), exceptions (`SpecialistParseError`, `CoordinatorParseError`, `AllSpecialistsFailedError`), parsing functions (`_parse_specialist`, `_parse_coordinator`, `_strip_code_fence`), and `run_diagnosis` async orchestrator using `asyncio.gather` + `asyncio.to_thread`.
+- `backend/lib/diagnosis/anthropic_agent.py` — widened `run()` signature to accept `images: list[bytes] | None = None` and `max_tokens: int = 256`. Images are attached as base64-encoded `type:"image"` content blocks before the text block.
+- `backend/lib/diagnosis/agent.py` — Protocol widened to match.
+- `backend/routes/diagnosis.py` — `POST /diagnosis/run` endpoint with photo resolution, agent factory, and exception-to-HTTP mapping.
+- `backend/main.py` — diagnosis router registered.
+- `prompts/diagnosis/bust/v1_baseline.md`, `prompts/diagnosis/waist_hip/v1_baseline.md`, `prompts/diagnosis/back/v1_baseline.md`, `prompts/diagnosis/coordinator/v1_baseline.md` — four thoughtful fit-theory prompts.
+- `backend/tests/fixtures/diagnosis/sample_front.png` — 64x64 white PNG fixture for integration test.
+
+### Deviations from spec
+
+1. **`_strip_code_fence` helper added** — Claude wraps JSON in markdown code fences (` ```json ... ``` `) even when instructed not to. Added a stripping function in `_parse_specialist` and `_parse_coordinator` to handle this gracefully. This is a reliability improvement not explicitly specified, but necessary for the live integration test to pass.
+
+2. **`ConfigError` re-raised from `_run_specialist`** — The spec says partial failure degrades gracefully. `ConfigError` (missing API key) is a fatal configuration error, not a transient per-specialist failure. The implementation re-raises it from `_run_specialist` so it propagates through `asyncio.gather` and is caught at the route level as a 500, not a 502. This matches the spec's error table but required explicit handling.
+
+3. **Timing test threshold** — The concurrency test originally used `< 200ms` with all four calls (specialists + coordinator) sleeping 100ms each. Fixed the coordinator to not sleep, keeping the assertion `< 200ms` for three concurrent 100ms specialists only. This correctly proves asyncio.gather concurrency.
+
+### Open questions
+
+- `issue_type` remains an open string as specified; should be tightened to an enum in V2 once cascade routing solidifies.
+- The blank PNG fixture doesn't trigger a specific cascade type reliably; a real muslin photo would be needed for meaningful cascade-type assertions in the integration test. The current fixture exercises the parsing pipeline end-to-end.
+- Consider adding a `@pytest.mark.integration` filter to the pytest config so integration tests can be excluded from CI runs without setting the env var.

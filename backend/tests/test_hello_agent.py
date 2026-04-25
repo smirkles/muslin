@@ -345,7 +345,7 @@ class TestAnthropicAgentWidenedSignature:
         assert len(image_blocks) == 2
 
         # Verify structure of each image block
-        for img_block, raw_bytes in zip(image_blocks, [bytes1, bytes2]):
+        for img_block, raw_bytes in zip(image_blocks, [bytes1, bytes2], strict=True):
             assert img_block["type"] == "image"
             source = img_block["source"]
             assert source["type"] == "base64"

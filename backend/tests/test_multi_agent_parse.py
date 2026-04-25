@@ -256,7 +256,7 @@ class TestParseCoordinator:
 
     def test_cascade_type_none_valid(self) -> None:
         """_parse_coordinator accepts cascade_type 'none'."""
-        from lib.diagnosis.multi_agent import DiagnosisResult, _parse_coordinator
+        from lib.diagnosis.multi_agent import _parse_coordinator
 
         text = json.dumps(
             {
