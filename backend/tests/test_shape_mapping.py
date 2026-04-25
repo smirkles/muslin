@@ -1,9 +1,7 @@
 """Tests for lib/body_model/shape_mapping.py — measurements_to_betas()."""
 
-import pytest
-
-from lib.measurements import MeasurementsResponse
 from lib.body_model.shape_mapping import measurements_to_betas
+from lib.measurements import MeasurementsResponse
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -23,10 +21,14 @@ REF_MEASUREMENTS = MeasurementsResponse(
 
 
 def _make_measurements(**overrides: float) -> MeasurementsResponse:
-    """Return REF_MEASUREMENTS with specific fields overridden."""
+    """Return REF_MEASUREMENTS with specific fields overridden.
+
+    Uses model_construct to bypass Pydantic validation so extreme clamping
+    values (e.g. bust_cm=250) can be tested without hitting field bounds.
+    """
     data = REF_MEASUREMENTS.model_dump()
     data.update(overrides)
-    return MeasurementsResponse(**data)
+    return MeasurementsResponse.model_construct(**data)
 
 
 # ---------------------------------------------------------------------------
@@ -161,7 +163,6 @@ class TestOtherBetaScaling:
 class TestImportHygiene:
     def test_shape_mapping_has_no_fastapi_import(self) -> None:
         """lib/body_model/shape_mapping must not import fastapi."""
-        import importlib.util
         import os
 
         spec_file = os.path.join(

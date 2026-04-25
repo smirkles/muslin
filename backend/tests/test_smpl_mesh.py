@@ -6,14 +6,12 @@ BEFORE importing smpl_mesh. This file uses module-level patching to achieve that
 
 from __future__ import annotations
 
-import importlib
 import sys
 from types import ModuleType
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
-
 
 # ---------------------------------------------------------------------------
 # Build a realistic mock of smplx.create's output
@@ -53,7 +51,11 @@ def _make_mock_smplx_module() -> tuple[ModuleType, MagicMock]:
 
 
 def _import_smpl_mesh_with_mock() -> tuple:
-    """Import smpl_mesh with smplx mocked at module scope.
+    """Import smpl_mesh with smplx and torch mocked at module scope.
+
+    smplx and torch are both lazily imported inside the module functions.
+    We inject them into sys.modules before importing the module so that
+    _get_model() and generate_mesh() see the mocks when called.
 
     Returns (smpl_mesh_module, mock_smplx, mock_model).
     """
@@ -64,12 +66,27 @@ def _import_smpl_mesh_with_mock() -> tuple:
 
     mock_smplx, mock_model = _make_mock_smplx_module()
 
-    with patch.dict("sys.modules", {"smplx": mock_smplx}):
+    # torch is imported lazily inside generate_mesh(); mock it so the function
+    # works without a real PyTorch install.
+    mock_torch = MagicMock()
+    mock_torch.float32 = 1
+    mock_torch.tensor.return_value = MagicMock()
+
+    # Import the module with mocks already in sys.modules so that any immediate
+    # top-level references resolve correctly.
+    with patch.dict("sys.modules", {"smplx": mock_smplx, "torch": mock_torch}):
         import lib.body_model.smpl_mesh as smpl_mesh_mod
 
-        # Keep the mock in modules so subsequent imports within the test work
-        sys.modules["smplx"] = mock_smplx
-        return smpl_mesh_mod, mock_smplx, mock_model
+    # Reset the module-level model cache so _get_model() calls smplx.create()
+    # through the mock rather than reusing a stale real model.
+    smpl_mesh_mod._smpl_model = None
+
+    # Keep mocks active AFTER patch.dict exits so the lazy imports inside
+    # _get_model() and generate_mesh() see them at call time.
+    sys.modules["smplx"] = mock_smplx
+    sys.modules["torch"] = mock_torch
+
+    return smpl_mesh_mod, mock_smplx, mock_model
 
 
 # ---------------------------------------------------------------------------
@@ -82,10 +99,12 @@ def smpl_mesh_module():
     """Provide a freshly-imported smpl_mesh module with smplx mocked."""
     mod, mock_smplx, mock_model = _import_smpl_mesh_with_mock()
     yield mod, mock_smplx, mock_model
-    # Cleanup: remove the module from sys.modules so it can be re-imported
+    # Cleanup: remove the module and test-only mocks from sys.modules
     for key in list(sys.modules.keys()):
         if "smpl_mesh" in key:
             del sys.modules[key]
+    sys.modules.pop("torch", None)
+    sys.modules.pop("smplx", None)
 
 
 # ---------------------------------------------------------------------------
@@ -136,9 +155,9 @@ class TestGenerateMesh:
         # Find positions accessor (typically accessor 0 for vertex positions)
         # We check that at least one accessor has count=6890
         vertex_counts = [acc.count for acc in gltf.accessors]
-        assert NUM_VERTICES in vertex_counts, (
-            f"Expected an accessor with count={NUM_VERTICES}, found counts: {vertex_counts}"
-        )
+        assert (
+            NUM_VERTICES in vertex_counts
+        ), f"Expected an accessor with count={NUM_VERTICES}, found counts: {vertex_counts}"
 
     def test_glb_contains_expected_face_count(self, smpl_mesh_module) -> None:
         """The returned GLB must have indices for 13776 faces (13776*3 = 41328 indices)."""

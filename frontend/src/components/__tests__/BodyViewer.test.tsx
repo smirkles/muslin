@@ -135,7 +135,11 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.restoreAllMocks();
+  // Do not use vi.restoreAllMocks() here — it calls mockRestore() on all vi.fn()
+  // mocks including those created inside vi.mock() factories, wiping their
+  // implementations and breaking tests that run after the first one.
+  // The rAF/cAF spies are re-created in beforeEach so no restore is needed.
+  vi.clearAllMocks();
 });
 
 // ---------------------------------------------------------------------------

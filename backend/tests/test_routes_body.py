@@ -3,14 +3,11 @@
 from __future__ import annotations
 
 import sys
-import uuid
-from types import ModuleType
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
-
 
 # ---------------------------------------------------------------------------
 # Setup: we must mock smplx BEFORE importing main (which imports routes/body)
@@ -47,27 +44,35 @@ def _make_mock_smplx() -> MagicMock:
 
 @pytest.fixture()
 def test_client():
-    """Return a FastAPI TestClient with smplx and generate_mesh mocked.
+    """Return a FastAPI TestClient with generate_mesh mocked to return fake GLB.
 
-    We patch generate_mesh at the routes layer so we don't need smplx.
+    We must remove 'main' from sys.modules before each fixture run so that
+    from main import app triggers a fresh import under the active patches.
+    Without this, a cached main holds stale route bindings that bypass the mock.
     """
-    # Remove cached modules to get a fresh import
+    _body_modules = (
+        "main",
+        "routes.body",
+        "lib.body_model.smpl_mesh",
+        "lib.body_model.shape_mapping",
+    )
     for key in list(sys.modules.keys()):
-        if key in ("routes.body", "lib.body_model.smpl_mesh", "lib.body_model.shape_mapping"):
+        if key in _body_modules:
             del sys.modules[key]
 
     mock_smplx = _make_mock_smplx()
 
     with patch.dict("sys.modules", {"smplx": mock_smplx}):
-        # Patch generate_mesh to return fake GLB bytes
+        # Patch generate_mesh at the smpl_mesh module level so that routes.body
+        # binds the mock when it is freshly imported below.
         with patch("lib.body_model.smpl_mesh.generate_mesh", return_value=_FAKE_GLB):
             from main import app
 
             yield TestClient(app)
 
-    # Cleanup
+    # Cleanup fresh imports so subsequent fixtures restart cleanly
     for key in list(sys.modules.keys()):
-        if key in ("routes.body", "lib.body_model.smpl_mesh"):
+        if key in ("main", "routes.body", "lib.body_model.smpl_mesh"):
             del sys.modules[key]
 
 
@@ -104,9 +109,7 @@ class TestBodyMeshEndpointSuccess:
         resp = test_client.post("/body/mesh", json={"measurement_id": stored_measurement_id})
         assert resp.headers["content-type"] == "model/gltf-binary"
 
-    def test_valid_id_body_starts_with_gltf_magic(
-        self, test_client, stored_measurement_id
-    ) -> None:
+    def test_valid_id_body_starts_with_gltf_magic(self, test_client, stored_measurement_id) -> None:
         """Response body starts with b'glTF' magic header."""
         resp = test_client.post("/body/mesh", json={"measurement_id": stored_measurement_id})
         assert resp.content[:4] == b"glTF", f"Expected GLB magic, got {resp.content[:4]!r}"
@@ -141,45 +144,24 @@ class TestBodyMeshEndpointNotFound:
 class TestBodyMeshEndpointSmplxFailure:
     def test_smplx_error_returns_500(self, stored_measurement_id) -> None:
         """When generate_mesh raises, endpoint returns 500."""
-        for key in list(sys.modules.keys()):
-            if key in ("routes.body", "lib.body_model.smpl_mesh"):
-                del sys.modules[key]
+        # Patch the name in routes.body's namespace (where the route looks it up).
+        # Patching lib.body_model.smpl_mesh.generate_mesh would not work because
+        # routes.body already holds its own local binding to the function.
+        import main
 
-        mock_smplx = _make_mock_smplx()
-
-        with patch.dict("sys.modules", {"smplx": mock_smplx}):
-            with patch(
-                "lib.body_model.smpl_mesh.generate_mesh",
-                side_effect=RuntimeError("smplx crashed"),
-            ):
-                from main import app as fresh_app
-
-                client = TestClient(fresh_app, raise_server_exceptions=False)
-                resp = client.post(
-                    "/body/mesh", json={"measurement_id": stored_measurement_id}
-                )
-                assert resp.status_code == 500
+        with patch("routes.body.generate_mesh", side_effect=RuntimeError("smplx crashed")):
+            client = TestClient(main.app, raise_server_exceptions=False)
+            resp = client.post("/body/mesh", json={"measurement_id": stored_measurement_id})
+            assert resp.status_code == 500
 
     def test_smplx_error_returns_correct_detail(self, stored_measurement_id) -> None:
         """When generate_mesh raises, detail is "mesh generation failed"."""
-        for key in list(sys.modules.keys()):
-            if key in ("routes.body", "lib.body_model.smpl_mesh"):
-                del sys.modules[key]
+        import main
 
-        mock_smplx = _make_mock_smplx()
-
-        with patch.dict("sys.modules", {"smplx": mock_smplx}):
-            with patch(
-                "lib.body_model.smpl_mesh.generate_mesh",
-                side_effect=RuntimeError("smplx crashed"),
-            ):
-                from main import app as fresh_app
-
-                client = TestClient(fresh_app, raise_server_exceptions=False)
-                resp = client.post(
-                    "/body/mesh", json={"measurement_id": stored_measurement_id}
-                )
-                assert resp.json()["detail"] == "mesh generation failed"
+        with patch("routes.body.generate_mesh", side_effect=RuntimeError("smplx crashed")):
+            client = TestClient(main.app, raise_server_exceptions=False)
+            resp = client.post("/body/mesh", json={"measurement_id": stored_measurement_id})
+            assert resp.json()["detail"] == "mesh generation failed"
 
 
 # ---------------------------------------------------------------------------
