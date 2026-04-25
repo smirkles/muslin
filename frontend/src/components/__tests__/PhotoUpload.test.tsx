@@ -55,7 +55,7 @@ describe("PhotoUpload", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Point apiModule.postPhotos to our local mock
-    (apiModule as { postPhotos: typeof mockPostPhotos }).postPhotos = mockPostPhotos;
+    (apiModule as unknown as { postPhotos: typeof mockPostPhotos }).postPhotos = mockPostPhotos;
   });
 
   // -------------------------------------------------------------------------
