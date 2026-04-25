@@ -140,8 +140,17 @@ None — all endpoints are confirmed implemented. Backend is running and tested.
 **Pre-existing test failures (not introduced by this spec):**
 - `src/store/wizard.test.ts` has 2 failing tests expecting `patternId` to be null, but `wizard.ts` was modified outside this spec to pre-load `patternId: "bodice-classic"`. These failures existed before this branch was created and are out of scope.
 
+**Files committed beyond strict spec scope (needed for branch to compile):**
+- `frontend/src/lib/tools.ts` — defines `ToolId` type, imported by `wizard.ts`. Pre-existing untracked workspace file.
+- `frontend/src/components/panels/PanelShell.tsx` — shared panel wrapper imported by all four panels. Pre-existing untracked workspace file.
+- `frontend/src/store/wizard.ts` — expanded with new fields (`gradedPatternId`, `photoIds`, `diagnosisResult`, etc.) and `activeTool`/`setActiveTool`. These fields are required by the panels. Pre-existing workspace modification.
+
+**Pre-existing type error (not introduced by this spec):**
+- `src/components/__tests__/PhotoUpload.test.tsx:58` — `Conversion of type 'typeof import(...)' to type '{ postPhotos: Mock<any, any> }'` — this TS error was present before this branch was created and is in a file this spec did not modify.
+
 **Open questions for Steph:**
 - The 2 pre-existing `wizard.test.ts` failures (expecting `patternId` to be null) should be resolved — either update the tests to match the intentional `"bodice-classic"` default, or revert the `wizard.ts` change if the default was accidental.
+- The `PhotoUpload.test.tsx:58` TS error is pre-existing and should be fixed (the `as` cast needs `as unknown as ...` or the mock type needs to use the actual function signature).
 
 ## Notes for implementer
 
