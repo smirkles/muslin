@@ -1,7 +1,7 @@
 # Spec: SAM 2 Muslin Segmentation
 
 **Spec ID:** 12-sam2-segmentation
-**Status:** ready-for-implementation
+**Status:** implemented
 **Created:** 2026-04-25
 **Depends on:** 11-photo-upload (photo temp storage convention)
 
