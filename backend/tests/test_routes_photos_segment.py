@@ -158,6 +158,18 @@ class TestSegmentHappyPath:
                 )
         assert resp.status_code == 200
 
+    def test_malformed_point_prompt_single_element_returns_422(self, tmp_path: Path) -> None:
+        """point_prompt with only one element returns 422 (Pydantic validation)."""
+        mid, photo_id = upload_photo(tmp_path)
+        resp = client.post(f"/photos/{photo_id}/segment", json={"point_prompt": [0.5]})
+        assert resp.status_code == 422
+
+    def test_malformed_point_prompt_three_elements_returns_422(self, tmp_path: Path) -> None:
+        """point_prompt with three elements returns 422 (Pydantic validation)."""
+        mid, photo_id = upload_photo(tmp_path)
+        resp = client.post(f"/photos/{photo_id}/segment", json={"point_prompt": [0.1, 0.2, 0.3]})
+        assert resp.status_code == 422
+
 
 # ---------------------------------------------------------------------------
 # Error cases

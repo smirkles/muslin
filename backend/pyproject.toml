@@ -16,6 +16,7 @@ dependencies = [
     "python-dotenv>=1.0.0",
     "httpx>=0.27.0",
     "trimesh>=4.12.1",
+    "replicate>=1.0.7",
 ]
 
 [dependency-groups]
@@ -56,7 +57,7 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 pythonpath = ["."]
 markers = [
-    "integration: hits real external APIs; requires credentials (ANTHROPIC_API_KEY)",
+    "integration: hits real external APIs; requires credentials (ANTHROPIC_API_KEY or REPLICATE_API_TOKEN)",
 ]
 
 [tool.mypy]

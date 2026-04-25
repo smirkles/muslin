@@ -203,6 +203,16 @@ class TestSegmentErrors:
                 with pytest.raises(RuntimeError, match="Replicate exploded"):
                     ReplicateSegmenter().segment(photo_file)
 
+    def test_empty_masks_raises_runtime_error(self, photo_file: Path) -> None:
+        """RuntimeError is raised when Replicate returns an empty masks list."""
+        from lib.segmentation.replicate_segmenter import ReplicateSegmenter
+
+        with patch.dict(os.environ, {"REPLICATE_API_TOKEN": "test-token"}):
+            with patch("lib.segmentation.replicate_segmenter.replicate.run") as mock_run:
+                mock_run.return_value = {"masks": [], "iou_score": 0.0}
+                with pytest.raises(RuntimeError, match="no masks"):
+                    ReplicateSegmenter().segment(photo_file)
+
 
 # ---------------------------------------------------------------------------
 # Import hygiene

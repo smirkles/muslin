@@ -9,7 +9,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Form, HTTPException, UploadFile
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from lib.measurements import get_measurements
 from lib.photos.store import lookup_photo_by_id, store_photo
@@ -19,7 +19,7 @@ from lib.photos.validate import (
     validate_photo,
 )
 from lib.segmentation.replicate_segmenter import ReplicateSegmenter
-from lib.segmentation.segmenter import ConfigError
+from lib.segmentation.segmenter import ConfigError, Segmenter
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["photos"])
@@ -120,7 +120,7 @@ def _get_extension(filename: str) -> str:
 class SegmentRequest(BaseModel):
     """Optional request body for POST /photos/{photo_id}/segment."""
 
-    point_prompt: list[float] | None = None
+    point_prompt: Annotated[list[float], Field(min_length=2, max_length=2)] | None = None
 
 
 class SegmentResponse(BaseModel):
@@ -132,7 +132,7 @@ class SegmentResponse(BaseModel):
     confidence: float
 
 
-def get_segmenter() -> ReplicateSegmenter:
+def get_segmenter() -> Segmenter:
     """Return the segmenter instance used by the segment endpoint.
 
     Extracted so tests can patch it cleanly.

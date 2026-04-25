@@ -48,6 +48,7 @@ class ReplicateSegmenter:
         )
 
         # Output shape: {"masks": [<readable>], "iou_score": float}
+        # Replicate returns masks sorted by confidence (highest first) per API docs.
         masks = output.get("masks", [])
         if not masks:
             raise RuntimeError("Replicate returned no masks")
