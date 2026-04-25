@@ -3,5 +3,9 @@
   "name": "Basic Fitted Bodice",
   "description": "A simple fitted bodice block. Good starting point for FBA and swayback adjustments.",
   "piece_count": 2,
-  "svg_file": "bodice-v1.svg"
+  "svg_file": "bodice-v1.svg",
+  "base_bust_cm": 92,
+  "base_waist_cm": 74,
+  "base_hip_cm": 100,
+  "base_back_length_cm": 40
 }

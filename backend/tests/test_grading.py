@@ -16,7 +16,6 @@ from __future__ import annotations
 import importlib
 import re
 import sys
-from dataclasses import asdict
 from pathlib import Path
 
 import pytest
@@ -338,8 +337,8 @@ class TestIdentityCase:
         user_measurements_identical_obj,
     ) -> None:
         """AC: identical measurements → bodice bounding-box width within 1e-6 of original."""
-        from lib.pattern_ops import render_pattern
         from lib.grading import grade_pattern
+        from lib.pattern_ops import render_pattern
 
         g = grade_pattern(
             pattern,
@@ -362,8 +361,8 @@ class TestIdentityCase:
         user_measurements_identical_obj,
     ) -> None:
         """AC: identical measurements → skirt bounding-box height within 1e-6 of original."""
-        from lib.pattern_ops import render_pattern
         from lib.grading import grade_pattern
+        from lib.pattern_ops import render_pattern
 
         g = grade_pattern(
             pattern,
@@ -395,8 +394,8 @@ class TestBodiceScaling:
         user_measurements_larger_obj,
     ) -> None:
         """AC: bodice-front bounding-box width ratio equals user_bust/base_bust (±1e-6)."""
-        from lib.pattern_ops import render_pattern
         from lib.grading import grade_pattern
+        from lib.pattern_ops import render_pattern
 
         g = grade_pattern(
             pattern,
@@ -420,8 +419,8 @@ class TestBodiceScaling:
         user_measurements_smaller_obj,
     ) -> None:
         """AC: user bust < base bust → bodice bounding-box width strictly smaller."""
-        from lib.pattern_ops import render_pattern
         from lib.grading import grade_pattern
+        from lib.pattern_ops import render_pattern
 
         g = grade_pattern(
             pattern,
@@ -451,8 +450,8 @@ class TestSkirtScaling:
         user_measurements_larger_obj,
     ) -> None:
         """AC: skirt-front bounding-box width ratio equals user_hip/base_hip (±1e-6)."""
-        from lib.pattern_ops import render_pattern
         from lib.grading import grade_pattern
+        from lib.pattern_ops import render_pattern
 
         g = grade_pattern(
             pattern,
@@ -485,8 +484,8 @@ class TestVerticalScaling:
         user_measurements_larger_obj,
     ) -> None:
         """AC: bodice-front bounding-box height ratio equals back_length ratio (±1e-6)."""
-        from lib.pattern_ops import render_pattern
         from lib.grading import grade_pattern
+        from lib.pattern_ops import render_pattern
 
         g = grade_pattern(
             pattern,
@@ -500,7 +499,9 @@ class TestVerticalScaling:
 
         orig_h = _bbox_height(original_pts)
         graded_h = _bbox_height(graded_pts)
-        expected_ratio = user_measurements_larger_obj.back_length_cm / base_measurements_obj.back_length_cm
+        expected_ratio = (
+            user_measurements_larger_obj.back_length_cm / base_measurements_obj.back_length_cm
+        )
         assert abs(graded_h / orig_h - expected_ratio) < 1e-6
 
     def test_skirt_height_scales_by_back_length_ratio(
@@ -510,8 +511,8 @@ class TestVerticalScaling:
         user_measurements_larger_obj,
     ) -> None:
         """AC: skirt-front bounding-box height ratio equals back_length ratio (±1e-6)."""
-        from lib.pattern_ops import render_pattern
         from lib.grading import grade_pattern
+        from lib.pattern_ops import render_pattern
 
         g = grade_pattern(
             pattern,
@@ -525,7 +526,9 @@ class TestVerticalScaling:
 
         orig_h = _bbox_height(original_pts)
         graded_h = _bbox_height(graded_pts)
-        expected_ratio = user_measurements_larger_obj.back_length_cm / base_measurements_obj.back_length_cm
+        expected_ratio = (
+            user_measurements_larger_obj.back_length_cm / base_measurements_obj.back_length_cm
+        )
         assert abs(graded_h / orig_h - expected_ratio) < 1e-6
 
 
@@ -544,8 +547,8 @@ class TestInputImmutability:
         user_measurements_larger_obj,
     ) -> None:
         """grade_pattern does not mutate the input Pattern object."""
-        from lib.pattern_ops import render_pattern
         from lib.grading import grade_pattern
+        from lib.pattern_ops import render_pattern
 
         svg_before = render_pattern(pattern)
         grade_pattern(
@@ -574,7 +577,7 @@ class TestSessionStore:
         user_measurements_larger_obj,
     ) -> None:
         """AC: store then get returns an equal GradedPattern."""
-        from lib.grading import grade_pattern, get_graded_pattern, store_graded_pattern
+        from lib.grading import get_graded_pattern, grade_pattern, store_graded_pattern
 
         g = grade_pattern(
             pattern,
