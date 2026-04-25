@@ -36,8 +36,8 @@ from __future__ import annotations
 import copy
 import math
 import re
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 from lxml import etree
@@ -171,95 +171,128 @@ def _serialise_path_d(commands: list[tuple[str, list[float]]]) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Number-of-coordinates-per-command (for absolute commands)
-# ---------------------------------------------------------------------------
-
-# Maps command letter → number of (x,y) coordinate pairs used per repetition.
-# Commands that take only one coordinate per pair-equivalent are noted.
-_CMD_COORD_COUNT: dict[str, int] = {
-    "M": 2,  # x y
-    "L": 2,  # x y
-    "H": 1,  # x only
-    "V": 1,  # y only
-    "C": 6,  # x1 y1 x2 y2 x y
-    "S": 4,  # x2 y2 x y
-    "Q": 4,  # x1 y1 x y
-    "T": 2,  # x y
-    "A": 7,  # rx ry x-rotation large-arc sweep x y
-    "Z": 0,
-    "z": 0,
+# Coordinate pairs per command repetition (endpoint is the LAST pair).
+# Used to correctly resolve relative offsets for multi-pair commands (C, S, Q).
+_CMD_STRIDE: dict[str, int] = {
+    "M": 1,
+    "L": 1,
+    "C": 3,  # x1 y1 x2 y2 x y  — endpoint is pair index 2
+    "S": 2,  # x2 y2 x y        — endpoint is pair index 1
+    "Q": 2,  # x1 y1 x y        — endpoint is pair index 1
+    "T": 1,
 }
-
-# Relative versions use lower-case — we treat their numbers identically to
-# the absolute versions for the purpose of coordinate transformation.
-for _k, _v in list(_CMD_COORD_COUNT.items()):
-    _CMD_COORD_COUNT[_k.lower()] = _v
 
 
 def _transform_path_coords(
     d: str,
-    fn: Any,  # Callable[[float, float], tuple[float, float]]
+    fn: Callable[[float, float], tuple[float, float]],
 ) -> str:
     """Apply a 2-argument (x, y) → (x', y') transform to all coordinates in a path d.
 
-    For commands that have mixed position/parameter numbers (A, C, S, Q), the
-    transform is applied to coordinate pairs only (other parameters are left
-    as-is).  For V/H commands (single-axis), see _apply_to_H_V below.
+    All relative commands (lowercase) are resolved to absolute coordinates
+    using the tracked pen position before the transform is applied.  The output
+    always uses uppercase commands.
 
-    V1 assumption: all coordinates are treated as positional (x,y) pairs.
-    Bezier control points are transformed identically to anchor points.
+    H and V are promoted to L by resolving the missing axis from the tracked
+    pen position.  This is necessary for rotation, where a horizontal line is
+    no longer horizontal after the transform.
+
+    For multi-pair commands (C, S, Q), every pair's relative offset is measured
+    from the pen position at the START of that command repetition.
+
+    V1 assumption: Bezier control points are transformed identically to anchor
+    points (slight distortion under rotation for curved seams; flagged for v2).
     """
     commands = _parse_path_d(d)
     result: list[tuple[str, list[float]]] = []
+    cur_x, cur_y = 0.0, 0.0  # current pen position in original coords
+    start_x, start_y = 0.0, 0.0  # subpath start (for Z)
 
     for cmd, nums in commands:
         upper = cmd.upper()
+        is_rel = cmd.islower() and upper != "Z"
+
         if upper == "Z":
             result.append((cmd, []))
+            cur_x, cur_y = start_x, start_y
             continue
 
         if upper == "H":
-            # Horizontal line — only x coordinates
-            new_nums = []
+            # Promote H/h → L by supplying the current y from the pen
+            new_nums: list[float] = []
             for x in nums:
-                x2, _ = fn(x, 0.0)
-                new_nums.append(x2)
-            result.append((cmd, new_nums))
+                abs_x = cur_x + x if is_rel else x
+                x2, y2 = fn(abs_x, cur_y)
+                new_nums.extend([x2, y2])
+                cur_x = abs_x
+            result.append(("L", new_nums))
             continue
 
         if upper == "V":
-            # Vertical line — only y coordinates
+            # Promote V/v → L by supplying the current x from the pen
             new_nums = []
             for y in nums:
-                _, y2 = fn(0.0, y)
-                new_nums.append(y2)
-            result.append((cmd, new_nums))
+                abs_y = cur_y + y if is_rel else y
+                x2, y2 = fn(cur_x, abs_y)
+                new_nums.extend([x2, y2])
+                cur_y = abs_y
+            result.append(("L", new_nums))
             continue
 
         if upper == "A":
-            # Arc: rx ry x-rotation large-arc sweep x y  (7 params per arc)
+            # Arc: rx ry x-rotation large-arc sweep x y (7 params per arc).
+            # Only the endpoint (indices 5,6) is a coordinate; others are
+            # arc parameters and must not be transformed.
             new_nums = list(nums)
+            rep_x, rep_y = cur_x, cur_y
             i = 0
             while i + 6 < len(nums):
-                x, y = nums[i + 5], nums[i + 6]
-                x2, y2 = fn(x, y)
+                abs_x = rep_x + nums[i + 5] if is_rel else nums[i + 5]
+                abs_y = rep_y + nums[i + 6] if is_rel else nums[i + 6]
+                x2, y2 = fn(abs_x, abs_y)
                 new_nums[i + 5] = x2
                 new_nums[i + 6] = y2
+                rep_x, rep_y = abs_x, abs_y
+                cur_x, cur_y = abs_x, abs_y
                 i += 7
-            result.append((cmd, new_nums))
+            result.append(("A", new_nums))
             continue
 
-        # All other commands: treat every pair of numbers as (x, y)
-        new_nums: list[float] = []
+        # M, L, C, S, Q, T
+        # For relative commands, all offsets within one repetition are measured
+        # from the pen position at the START of that repetition (not cumulative).
+        stride = _CMD_STRIDE.get(upper, 1)
+        stride_floats = stride * 2  # number of floats per repetition
+
+        new_nums = []
         i = 0
+        rep_start_x, rep_start_y = cur_x, cur_y
+
         while i + 1 < len(nums):
-            x2, y2 = fn(nums[i], nums[i + 1])
+            pair_in_rep = (i % stride_floats) // 2
+
+            # New repetition: update rep_start to the previous endpoint
+            if pair_in_rep == 0 and i > 0:
+                rep_start_x, rep_start_y = cur_x, cur_y
+
+            abs_x = rep_start_x + nums[i] if is_rel else nums[i]
+            abs_y = rep_start_y + nums[i + 1] if is_rel else nums[i + 1]
+            x2, y2 = fn(abs_x, abs_y)
             new_nums.extend([x2, y2])
+
+            # Advance pen to endpoint (last pair in the repetition)
+            if pair_in_rep == stride - 1:
+                cur_x, cur_y = abs_x, abs_y
+                # Per SVG spec, only the first pair of an M block sets subpath start.
+                # Subsequent pairs are implicit lineto's and must not reset it.
+                if upper == "M" and i == 0:
+                    start_x, start_y = cur_x, cur_y
+
             i += 2
+
         if i < len(nums):
-            # Odd trailing number — shouldn't happen in valid SVG but handle safely
-            new_nums.append(nums[i])
-        result.append((cmd, new_nums))
+            new_nums.append(nums[i])  # odd trailing number — guard only
+        result.append((upper, new_nums))
 
     return _serialise_path_d(result)
 
@@ -303,7 +336,7 @@ def _rotation_matrix(angle_deg: float) -> np.ndarray:
 def _make_rotate_fn(
     angle_deg: float,
     pivot: tuple[float, float],
-) -> Any:  # Callable[[float, float], tuple[float, float]]
+) -> Callable[[float, float], tuple[float, float]]:
     """Return a coordinate-pair transform function for rotation around a pivot."""
     R = _rotation_matrix(angle_deg)
     px, py = pivot
@@ -604,6 +637,12 @@ def add_dart(
     - ``width`` is the base width of the dart.
     - ``length`` is the distance from tip to base centre.
 
+    Convention: ``position`` should be the interior-facing point (i.e., toward
+    the pattern body), and ``angle_deg`` should point toward the seam edge.
+    Callers are responsible for choosing these values to produce a dart that
+    points toward the pattern interior; this function does not validate
+    orientation.
+
     The element is appended to the SVG root and registered in the id index.
     """
     new_pattern = pattern._deep_copy()
@@ -738,79 +777,148 @@ def _element_centroid(el: etree._Element) -> tuple[float, float] | None:
     return (sum(xs) / len(xs), sum(ys) / len(ys))
 
 
-def _path_length(el: etree._Element) -> float:
-    """Return the Euclidean length of a path (start-to-end straight-line distance).
+def _path_anchor_points(d: str) -> list[tuple[float, float]]:
+    """Return the on-curve anchor points of a path, normalised to absolute first.
 
-    For V1, length is defined as the distance between the first and last
-    coordinate pairs in the path (ignoring intermediate points / curves).
-    This matches the spec's expectation for straight seam lines.
-
-    Raises GeometryError if the path has fewer than 2 coordinate pairs.
+    For each command repetition, only the endpoint is included — Bezier control
+    points are skipped.  This gives exact arc length for M/L paths and a
+    chord-length lower-bound approximation for curved segments (spec-10 handles
+    full Bezier arc length).
     """
-    d = el.get("d", "")
-    commands = _parse_path_d(d)
-    all_coords: list[tuple[float, float]] = []
+    d_norm = _transform_path_coords(d, lambda x, y: (x, y))
+    commands = _parse_path_d(d_norm)
 
+    # pairs per command repetition / which pair (0-indexed) is the endpoint
+    _STRIDE: dict[str, int] = {"M": 1, "L": 1, "C": 3, "S": 2, "Q": 2, "T": 1}
+    _EP: dict[str, int] = {"M": 0, "L": 0, "C": 2, "S": 1, "Q": 1, "T": 0}
+
+    anchors: list[tuple[float, float]] = []
     for cmd, nums in commands:
         upper = cmd.upper()
-        if upper == "Z":
-            continue
+        if upper not in _STRIDE:
+            continue  # Z, A (H/V already normalised to L)
+        stride = _STRIDE[upper]
+        ep = _EP[upper]
+        stride_floats = stride * 2
         i = 0
-        while i + 1 < len(nums):
-            all_coords.append((nums[i], nums[i + 1]))
-            i += 2
+        while i < len(nums):
+            ep_i = i + ep * 2
+            if ep_i + 1 < len(nums):
+                anchors.append((nums[ep_i], nums[ep_i + 1]))
+            i += stride_floats
 
-    if len(all_coords) < 2:
+    return anchors
+
+
+def _path_length(el: etree._Element) -> float:
+    """Return the polyline arc length of a path element.
+
+    Arc length is the sum of Euclidean distances between consecutive on-curve
+    anchor points.  For Bezier commands only the segment endpoint is used
+    (chord-length approximation); full Bezier arc length is deferred to spec-10.
+
+    Raises GeometryError if the path has fewer than 2 anchor points.
+    """
+    anchors = _path_anchor_points(el.get("d", ""))
+    if len(anchors) < 2:
         raise GeometryError("Path has fewer than 2 coordinates; cannot measure length")
-
-    start = np.array(all_coords[0])
-    end = np.array(all_coords[-1])
-    return float(np.linalg.norm(end - start))
+    return sum(
+        float(np.linalg.norm(np.array(anchors[i + 1]) - np.array(anchors[i])))
+        for i in range(len(anchors) - 1)
+    )
 
 
 def _adjust_path_endpoint_length(el: etree._Element, target_length: float) -> None:
-    """Move the endpoint of a path in-place so its length equals ``target_length``.
+    """Move the endpoint of a path in-place so its polyline arc length equals target_length.
 
-    The start point is fixed.  The endpoint is moved along the vector from
-    start→end, scaled to ``target_length``.
+    All intermediate anchor points are held fixed.  For extension, the last
+    segment is lengthened in its own direction.  For shortening, the path is
+    truncated at the correct arc position with the final point interpolated.
+
+    Chord-length approximation is used for Bezier segments (spec-10 will fix).
     """
     d = el.get("d", "")
-    commands = _parse_path_d(d)
-    all_coords: list[tuple[float, float]] = []
+    # Normalise to absolute/uppercase so index arithmetic is straightforward
+    d_norm = _transform_path_coords(d, lambda x, y: (x, y))
+    commands = list(_parse_path_d(d_norm))
+    anchors = _path_anchor_points(d)
 
-    for cmd, nums in commands:
-        upper = cmd.upper()
-        if upper == "Z":
-            continue
-        i = 0
-        while i + 1 < len(nums):
-            all_coords.append((nums[i], nums[i + 1]))
-            i += 2
-
-    if len(all_coords) < 2:
+    if len(anchors) < 2:
         raise GeometryError("Path has fewer than 2 coordinates; cannot adjust length")
 
-    start = np.array(all_coords[0], dtype=float)
-    end = np.array(all_coords[-1], dtype=float)
-    vec = end - start
-    vec_len = float(np.linalg.norm(vec))
+    # Build cumulative arc lengths
+    cumulative = [0.0]
+    for i in range(1, len(anchors)):
+        seg = float(np.linalg.norm(np.array(anchors[i]) - np.array(anchors[i - 1])))
+        cumulative.append(cumulative[-1] + seg)
 
-    if vec_len < 1e-9:
+    total = cumulative[-1]
+    if total < 1e-9:
         raise GeometryError("Cannot adjust endpoint of a zero-length path")
 
-    # New endpoint along same direction, at target_length distance from start
-    new_end = start + (vec / vec_len) * target_length
+    if target_length >= total:
+        # Extend: move the last anchor along the last segment's direction
+        p0 = np.array(anchors[-2], dtype=float)
+        p1 = np.array(anchors[-1], dtype=float)
+        seg_vec = p1 - p0
+        seg_len = float(np.linalg.norm(seg_vec))
+        if seg_len < 1e-9:
+            raise GeometryError("Cannot extend: last segment has zero length")
+        extra = target_length - cumulative[-2]
+        new_end = p0 + (seg_vec / seg_len) * extra
+        anchor_idx = len(anchors) - 1  # update the last anchor in the command list
+    else:
+        # Shorten: find which segment contains the target, interpolate
+        new_end = np.array(anchors[0], dtype=float)
+        anchor_idx = 1
+        for i in range(1, len(anchors)):
+            if cumulative[i] >= target_length:
+                seg_len = cumulative[i] - cumulative[i - 1]
+                t = (target_length - cumulative[i - 1]) / seg_len
+                new_end = np.array(anchors[i - 1]) + t * (
+                    np.array(anchors[i]) - np.array(anchors[i - 1])
+                )
+                anchor_idx = i
+                break
 
-    # Rewrite the last coordinate pair in the command list
-    # Walk backward through commands to find the last pair
-    for i in reversed(range(len(commands))):
-        cmd, nums = commands[i]
-        upper = cmd.upper()
-        if upper in ("Z",) or not nums:
-            continue
-        # Find the last pair in this command's numbers
-        if len(nums) >= 2:
-            commands[i] = (cmd, list(nums[:-2]) + [float(new_end[0]), float(new_end[1])])
+    # Rewrite commands: find the command whose endpoint is anchor_idx and update it;
+    # drop any commands beyond that point.
+    _STRIDE: dict[str, int] = {"M": 1, "L": 1, "C": 3, "S": 2, "Q": 2, "T": 1}
+    _EP: dict[str, int] = {"M": 0, "L": 0, "C": 2, "S": 1, "Q": 1, "T": 0}
+
+    ai = 0  # current anchor index
+    new_commands: list[tuple[str, list[float]]] = []
+    done = False
+
+    for cmd, nums in commands:
+        if done:
             break
+        upper = cmd.upper()
+        if upper not in _STRIDE:
+            new_commands.append((cmd, list(nums)))
+            continue
 
-    el.set("d", _serialise_path_d(commands))
+        stride = _STRIDE[upper]
+        ep = _EP[upper]
+        stride_floats = stride * 2
+        new_nums: list[float] = []
+        i = 0
+
+        while i < len(nums) and not done:
+            ep_i = i + ep * 2
+            if ep_i + 1 >= len(nums):
+                break
+            if ai == anchor_idx:
+                # Replace this endpoint with new_end; keep preceding params in repetition
+                new_nums.extend(nums[i:ep_i])
+                new_nums.extend([float(new_end[0]), float(new_end[1])])
+                done = True
+            else:
+                new_nums.extend(nums[i : i + stride_floats])
+                ai += 1
+            i += stride_floats
+
+        if new_nums:
+            new_commands.append((upper, new_nums))
+
+    el.set("d", _serialise_path_d(new_commands))
