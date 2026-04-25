@@ -20,15 +20,38 @@ from __future__ import annotations
 import logging
 import uuid
 from dataclasses import dataclass
+from typing import Protocol
 
 from lib.pattern_ops import (
+    ElementNotFound,
     Pattern,
-    _element_bbox,
+    element_bbox,
+    get_element,
+    piece_ids,
     render_pattern,
     scale_element,
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Measurement protocol
+# ---------------------------------------------------------------------------
+
+
+class MeasurementsProtocol(Protocol):
+    """Structural type for any object providing body measurements in centimetres.
+
+    Compatible with lib.measurements.Measurements and any other dataclass or
+    named tuple that exposes the four required float attributes.
+    """
+
+    bust_cm: float
+    waist_cm: float
+    hip_cm: float
+    back_length_cm: float
+
 
 # ---------------------------------------------------------------------------
 # Data classes
@@ -108,28 +131,10 @@ def _horizontal_scale_for_piece(
 # ---------------------------------------------------------------------------
 
 
-def _piece_ids_from_pattern(pattern: Pattern) -> list[str]:
-    """Return the ids of all direct <g> children of the SVG root.
-
-    Only direct <g> children are treated as top-level pieces to avoid
-    double-grading nested groups inside a piece.
-    """
-    from lib.pattern_ops import _G_TAGS
-
-    root = pattern._tree.getroot()
-    piece_ids: list[str] = []
-    for child in root:
-        if child.tag in _G_TAGS:
-            eid = child.get("id")
-            if eid:
-                piece_ids.append(eid)
-    return piece_ids
-
-
 def grade_pattern(
     pattern: Pattern,
     base_measurements: BaseMeasurements,
-    user_measurements: object,
+    user_measurements: MeasurementsProtocol,
     pattern_id: str,
     measurement_id: str,
 ) -> GradedPattern:
@@ -166,15 +171,18 @@ def grade_pattern(
         ),
     }
 
-    piece_ids = _piece_ids_from_pattern(pattern)
+    ids = piece_ids(pattern)
     current_pattern = pattern
 
-    for piece_id in piece_ids:
+    for piece_id in ids:
         sx = _horizontal_scale_for_piece(piece_id, sx_bust, sx_hip)
 
         # Compute pivot as bounding-box centre of the piece in current_pattern
-        el = current_pattern._id_index.get(piece_id)
-        bbox = _element_bbox(el) if el is not None else None
+        try:
+            el = get_element(current_pattern, piece_id)
+            bbox = element_bbox(el)
+        except ElementNotFound:
+            bbox = None
         if bbox is None:
             logger.warning("piece %r has no geometry; skipping grade", piece_id)
             continue

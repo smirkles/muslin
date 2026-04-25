@@ -32,8 +32,10 @@ from lib.pattern_ops import (
     Pattern,
     PatternError,
     add_dart,
+    element_bbox,
     get_element,
     load_pattern,
+    piece_ids,
     render_pattern,
     rotate_element,
     slash_line,
@@ -1363,3 +1365,84 @@ class TestRelativeMultiPairCommands:
         assert abs(coords[1][1] - 10.0) < 1e-4, f"implicit-L y: expected 10, got {coords[1][1]}"
         # Z must be present (path closes)
         assert "Z" in d.upper(), "Z command must be preserved after translate"
+
+
+# ---------------------------------------------------------------------------
+# Public API: piece_ids and element_bbox (review fix — expose as public API)
+# ---------------------------------------------------------------------------
+
+
+class TestPieceIds:
+    """piece_ids() is a public function that returns top-level <g> ids only."""
+
+    def test_returns_top_level_g_ids(self) -> None:
+        """piece_ids returns ids of direct <g> children of the SVG root."""
+        p = load_pattern(GROUPED_PIECE_SVG)
+        ids = piece_ids(p)
+        assert "bodice-front" in ids
+        assert "outer-g" in ids
+
+    def test_excludes_non_g_top_level_elements(self) -> None:
+        """piece_ids does not include ids of top-level <path> or other non-<g> elements."""
+        p = load_pattern(GROUPED_PIECE_SVG)
+        ids = piece_ids(p)
+        # sibling-path is a top-level <path>, not a <g> — must be excluded
+        assert "sibling-path" not in ids
+
+    def test_excludes_nested_g_elements(self) -> None:
+        """piece_ids does not recurse — inner-g nested inside outer-g is excluded."""
+        p = load_pattern(GROUPED_PIECE_SVG)
+        ids = piece_ids(p)
+        assert "inner-g" not in ids
+
+    def test_returns_list(self) -> None:
+        """piece_ids returns a list (not a set or generator)."""
+        p = load_pattern(GROUPED_PIECE_SVG)
+        result = piece_ids(p)
+        assert isinstance(result, list)
+
+    def test_empty_svg_returns_empty_list(self) -> None:
+        """piece_ids returns [] for an SVG with no top-level <g> elements."""
+        svg_str = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+  <path id="lone-path" d="M 0,0 L 10,10"/>
+</svg>"""
+        p = load_pattern_from_string(svg_str)
+        result = piece_ids(p)
+        assert result == []
+
+
+class TestElementBbox:
+    """element_bbox() is accessible as a public API."""
+
+    def test_importable_from_pattern_ops(self) -> None:
+        """element_bbox is importable from lib.pattern_ops without error."""
+        # Import happened at top of file; reaching here means it succeeded.
+        assert callable(element_bbox)
+
+    def test_bbox_of_path_element(self) -> None:
+        """element_bbox returns correct (min_x, min_y, max_x, max_y) for a path."""
+        svg_str = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+  <path id="rect-path" d="M 10,20 L 90,20 L 90,80 L 10,80 Z"/>
+</svg>"""
+        p = load_pattern_from_string(svg_str)
+        el = get_element(p, "rect-path")
+        bbox = element_bbox(el)
+        assert bbox is not None
+        min_x, min_y, max_x, max_y = bbox
+        assert abs(min_x - 10.0) < 1e-6
+        assert abs(min_y - 20.0) < 1e-6
+        assert abs(max_x - 90.0) < 1e-6
+        assert abs(max_y - 80.0) < 1e-6
+
+    def test_bbox_of_empty_g_element_returns_none(self) -> None:
+        """element_bbox returns None for a <g> with no geometric coordinates."""
+        svg_str = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+  <g id="empty-g"/>
+</svg>"""
+        p = load_pattern_from_string(svg_str)
+        el = get_element(p, "empty-g")
+        result = element_bbox(el)
+        assert result is None

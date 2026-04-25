@@ -5,6 +5,8 @@ Thin handlers: delegate all logic to lib.pattern_registry and lib.grading.
 
 from __future__ import annotations
 
+from typing import cast
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
@@ -124,10 +126,10 @@ def grade_pattern_route(pattern_id: str, body: GradeRequest) -> GradedPatternRes
         )
 
     base_meas = BaseMeasurements(
-        bust_cm=meta.base_bust_cm,  # type: ignore[arg-type]
-        waist_cm=meta.base_waist_cm,  # type: ignore[arg-type]
-        hip_cm=meta.base_hip_cm,  # type: ignore[arg-type]
-        back_length_cm=meta.base_back_length_cm,  # type: ignore[arg-type]
+        bust_cm=cast(float, meta.base_bust_cm),
+        waist_cm=cast(float, meta.base_waist_cm),
+        hip_cm=cast(float, meta.base_hip_cm),
+        back_length_cm=cast(float, meta.base_back_length_cm),
     )
 
     # Load and grade the pattern

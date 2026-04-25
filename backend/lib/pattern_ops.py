@@ -383,6 +383,34 @@ def get_element(pattern: Pattern, element_id: str) -> etree._Element:
     return el
 
 
+def piece_ids(pattern: Pattern) -> list[str]:
+    """Return the ids of all direct <g> children of the SVG root.
+
+    Only top-level <g> elements are considered pieces.  Nested groups and
+    non-<g> elements at the root level are excluded.  Elements without an
+    id attribute are silently skipped.
+    """
+    root = pattern._tree.getroot()
+    result: list[str] = []
+    for child in root:
+        if child.tag in _G_TAGS:
+            eid = child.get("id")
+            if eid:
+                result.append(eid)
+    return result
+
+
+def element_bbox(
+    el: etree._Element,
+) -> tuple[float, float, float, float] | None:
+    """Return (min_x, min_y, max_x, max_y) bounding box of an element or <g> subtree.
+
+    Recursively gathers coordinates from all descendant elements.
+    Returns None if no coordinates can be extracted.
+    """
+    return _element_bbox(el)
+
+
 # ---------------------------------------------------------------------------
 # Element transformation helpers
 # ---------------------------------------------------------------------------
