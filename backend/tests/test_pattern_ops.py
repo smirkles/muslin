@@ -26,11 +26,12 @@ from hypothesis import given, settings
 from hypothesis import strategies as st
 from lxml import etree
 
-from lib.pattern_ops import (
+from lib.pattern_ops import (  # noqa: E402 — test file sets sys.path before this import
     ElementNotFound,
     GeometryError,
     Pattern,
     PatternError,
+    _path_length,  # noqa: F401 — private, intentional test access for spec-09
     add_dart,
     element_bbox,
     get_element,
@@ -1446,3 +1447,207 @@ class TestElementBbox:
         el = get_element(p, "empty-g")
         result = element_bbox(el)
         assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Spec 09 — Bezier arc length for curved seam measurement
+# ---------------------------------------------------------------------------
+
+
+class TestBezierArcLength:
+    """Spec-09: _path_length uses true Bezier arc length for C/S/Q segments.
+
+    Acceptance criteria:
+      AC1: cubic Bezier _path_length within 1% of high-precision reference
+      AC2: true_seam_length with Bezier seam B → seam A within 0.5 SVG units
+      AC3: straight-line path gives identical result (no regression)
+      AC4: S command path within 1% of equivalent C arc length
+      AC5: Q command path within 1% of high-precision reference
+      AC6: TestTrueSeamLengthPolyline regression suite still passes (run automatically)
+    """
+
+    # ---- AC1: cubic Bezier _path_length ----
+
+    def test_cubic_bezier_path_length_within_1pct_of_reference(self) -> None:
+        """_path_length for M 0,0 C 0,100 100,100 100,0 is within 1% of high-precision reference.
+
+        Note: the spec cites 157.08 (π·100/2) as the reference for this path, but that is
+        the arc length of the standard quarter-circle Bezier approximation (k≈0.5523 control
+        points). The true arc length of M 0,0 C 0,100 100,100 100,0 is exactly 200.0.
+        The high-precision n=1000 reference below is self-consistent.
+        """
+        svg_str = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+  <path id="p" d="M 0,0 C 0,100 100,100 100,0"/>
+</svg>"""
+        p = load_pattern_from_string(svg_str)
+        el = get_element(p, "p")
+        length = _path_length(el)
+
+        # High-precision reference via n=1000 chord-sum (true value = 200.0 exactly)
+        t = np.linspace(0.0, 1.0, 1001)
+        s = 1.0 - t
+        p0r = np.array([0.0, 0.0])
+        p1r = np.array([0.0, 100.0])
+        p2r = np.array([100.0, 100.0])
+        p3r = np.array([100.0, 0.0])
+        pts = (
+            (s**3)[:, None] * p0r
+            + (3 * s**2 * t)[:, None] * p1r
+            + (3 * s * t**2)[:, None] * p2r
+            + (t**3)[:, None] * p3r
+        )
+        reference = float(np.sum(np.linalg.norm(np.diff(pts, axis=0), axis=1)))  # ≈200.0
+
+        assert abs(length - reference) / reference < 0.01, (
+            f"Expected ≈{reference:.4f}, got {length:.4f} "
+            f"(error {abs(length - reference) / reference:.4%})"
+        )
+
+    def test_cubic_bezier_exceeds_chord_length(self) -> None:
+        """Arc length of a curved Bezier must exceed the straight-line chord."""
+        svg_str = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+  <path id="p" d="M 0,0 C 0,100 100,100 100,0"/>
+</svg>"""
+        p = load_pattern_from_string(svg_str)
+        el = get_element(p, "p")
+        length = _path_length(el)
+        chord = 100.0  # straight-line distance from (0,0) to (100,0)
+        assert length > chord, f"Arc length {length:.4f} should exceed chord {chord}"
+
+    # ---- AC2: true_seam_length with Bezier seam B ----
+
+    def test_true_seam_length_adjusts_to_bezier_reference(self) -> None:
+        """true_seam_length(p, seam_a, bezier_seam_b) → seam_a arc length within 0.5 SVG units.
+
+        seam-a starts at 50 SVG units; seam-b is a cubic Bezier with arc length ≈200 units.
+        After adjustment seam-a must be extended to match seam-b's arc length.
+        """
+        svg_str = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200">
+  <path id="seam-a" d="M 0,0 L 50,0"/>
+  <path id="seam-b" d="M 0,0 C 0,100 100,100 100,0"/>
+</svg>"""
+        p = load_pattern_from_string(svg_str)
+        p2 = true_seam_length(p, "seam-a", "seam-b")
+        new_d = get_element(p2, "seam-a").get("d")
+        coords = _extract_path_coords(new_d)
+        # seam-a is a straight line: arc length = Euclidean end-to-end distance
+        start = np.array(coords[0])
+        end = np.array(coords[-1])
+        new_len = float(np.linalg.norm(end - start))
+        b_len = _path_length(get_element(p, "seam-b"))
+        assert (
+            abs(new_len - b_len) < 0.5
+        ), f"seam-a length {new_len:.4f} not within 0.5 of target {b_len:.4f}"
+
+    # ---- AC3: straight-line path unchanged ----
+
+    def test_straight_line_path_length_identical_to_polyline(self) -> None:
+        """For M/L-only paths, _path_length result is identical to the polyline calculation."""
+        svg_str = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+  <path id="p" d="M 0,0 L 30,40 L 60,0"/>
+</svg>"""
+        p = load_pattern_from_string(svg_str)
+        el = get_element(p, "p")
+        # Polyline length: dist(0,0→30,40) + dist(30,40→60,0) = 50 + 50 = 100
+        expected = 50.0 + 50.0
+        length = _path_length(el)
+        assert abs(length - expected) < 1e-6, f"Expected {expected}, got {length:.6f}"
+
+    # ---- AC4: S (smooth cubic) command ----
+
+    def test_s_command_matches_equivalent_c_command(self) -> None:
+        """S with no prior C uses c1=pen (degenerate); arc length must match explicit C."""
+        # M 0,0 S 100,100 100,0 with no prior C → implied c1 = pen = (0,0)
+        # Equivalent explicit cubic: M 0,0 C 0,0 100,100 100,0
+        s_svg = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+  <path id="s-path" d="M 0,0 S 100,100 100,0"/>
+</svg>"""
+        c_svg = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+  <path id="c-path" d="M 0,0 C 0,0 100,100 100,0"/>
+</svg>"""
+        ps = load_pattern_from_string(s_svg)
+        pc = load_pattern_from_string(c_svg)
+        s_len = _path_length(get_element(ps, "s-path"))
+        c_len = _path_length(get_element(pc, "c-path"))
+        assert (
+            abs(s_len - c_len) < 0.01
+        ), f"S-path length {s_len:.4f} != equivalent C-path length {c_len:.4f}"
+
+    def test_s_command_after_c_matches_explicit_c_equivalent(self) -> None:
+        """S after C uses the reflected c1 from the prior C's c2; result matches explicit C.
+
+        Path: M 0,0 C 0,50 50,100 100,100 S 200,100 200,0
+        Prior c2=(50,100), prior endpoint=(100,100) → reflected c1=(150,100)
+        Equivalent: M 0,0 C 0,50 50,100 100,100 C 150,100 200,100 200,0
+        """
+        s_svg = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200">
+  <path id="p" d="M 0,0 C 0,50 50,100 100,100 S 200,100 200,0"/>
+</svg>"""
+        c_svg = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200">
+  <path id="p" d="M 0,0 C 0,50 50,100 100,100 C 150,100 200,100 200,0"/>
+</svg>"""
+        ps = load_pattern_from_string(s_svg)
+        pc = load_pattern_from_string(c_svg)
+        s_len = _path_length(get_element(ps, "p"))
+        c_len = _path_length(get_element(pc, "p"))
+        assert (
+            abs(s_len - c_len) < 0.01
+        ), f"S-after-C length {s_len:.4f} != equivalent C-C length {c_len:.4f}"
+
+    def test_s_command_exceeds_chord_length(self) -> None:
+        """S command arc length must exceed the chord when the path is curved."""
+        svg_str = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200">
+  <path id="p" d="M 0,0 C 0,50 50,100 100,100 S 200,100 200,0"/>
+</svg>"""
+        p = load_pattern_from_string(svg_str)
+        el = get_element(p, "p")
+        length = _path_length(el)
+        chord = 200.0  # straight-line from (0,0) to (200,0)
+        assert length > chord, f"Arc length {length:.4f} should exceed chord {chord}"
+
+    # ---- AC5: Q (quadratic Bezier) command ----
+
+    def test_quadratic_bezier_path_length_within_1pct_of_high_precision(self) -> None:
+        """_path_length for a Q command path is within 1% of a high-precision reference."""
+        svg_str = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+  <path id="p" d="M 0,0 Q 0,100 100,100"/>
+</svg>"""
+        p = load_pattern_from_string(svg_str)
+        el = get_element(p, "p")
+
+        # High-precision reference using n=1000 chord-sum
+        t = np.linspace(0.0, 1.0, 1001)
+        s = 1.0 - t
+        p0r = np.array([0.0, 0.0])
+        p1r = np.array([0.0, 100.0])
+        p2r = np.array([100.0, 100.0])
+        pts = (s**2)[:, None] * p0r + (2 * s * t)[:, None] * p1r + (t**2)[:, None] * p2r
+        reference = float(np.sum(np.linalg.norm(np.diff(pts, axis=0), axis=1)))
+
+        length = _path_length(el)
+        assert abs(length - reference) / reference < 0.01, (
+            f"Q path: expected ≈{reference:.4f}, got {length:.4f} "
+            f"(error {abs(length - reference) / reference:.4%})"
+        )
+
+    def test_quadratic_bezier_exceeds_chord_length(self) -> None:
+        """Q command arc length must exceed the chord when the path is curved."""
+        svg_str = """<?xml version="1.0" encoding="utf-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200">
+  <path id="p" d="M 0,0 Q 0,100 100,100"/>
+</svg>"""
+        p = load_pattern_from_string(svg_str)
+        el = get_element(p, "p")
+        length = _path_length(el)
+        chord = float(np.linalg.norm(np.array([100.0, 100.0])))  # ≈ 141.42
+        assert length > chord, f"Arc length {length:.4f} should exceed chord {chord:.4f}"

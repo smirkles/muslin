@@ -1,7 +1,7 @@
 # Spec: Bezier Arc Length for Pattern Seam Measurement
 
 **Spec ID:** 09-bezier-arc-length
-**Status:** ready-for-implementation
+**Status:** implemented
 **Created:** 2026-04-24
 **Depends on:** 01-pattern-svg-library
 
@@ -30,7 +30,7 @@ Same as before: a new `Pattern` where `seam_a`'s arc length equals `seam_b`'s ar
 
 ## Acceptance criteria
 
-- [ ] Given a cubic Bezier path `M 0,0 C 0,100 100,100 100,0` (quarter-ellipse approximation, true arc length ≈ 157.08), when `_path_length` is called, then the result is within 1% of 157.08.
+- [ ] Given a cubic Bezier path `M 0,0 C 0,100 100,100 100,0` (true arc length = 200.0 exactly, analytically verified), when `_path_length` is called, then the result is within 1% of 200.0.
 - [ ] Given two paths where seam B is a cubic Bezier of known arc length L, when `true_seam_length(p, seam_a_id, seam_b_id)` is called, then the resulting seam A has arc length within 0.5 mm (or 0.5 SVG units) of L.
 - [ ] Given a straight-line path (M/L only), when `_path_length` is called, the result is identical to the pre-existing polyline calculation (no regression).
 - [ ] Given a path with S (smooth cubic) commands, when `_path_length` is called, the result is within 1% of the true arc length (verified against a reference value computed by numerical integration or a trusted library).
@@ -69,7 +69,7 @@ Pen-position tracking is already done (introduced in the B1/B2 fix). Reuse that 
 
 - **Unit tests** in `backend/tests/test_pattern_ops.py`, new class `TestBezierArcLength`.
 - Reference values for cubic Bezier arc lengths can be computed via scipy `integrate.quad` on the speed function, or taken from published tables for standard curves.
-- Test the quarter-ellipse approximation `M 0,0 C 0,100 100,100 100,0` — a well-known case with reference ≈ 157.08.
+- Test the Bezier path `M 0,0 C 0,100 100,100 100,0` — exact arc length = 200.0 (analytically: ∫₀¹ 300(2t²-2t+1) dt = 200).
 - Test that regression suite (`TestTrueSeamLengthPolyline`) still passes.
 - No hypothesis property tests needed here — deterministic geometry, fixed fixtures suffice.
 
