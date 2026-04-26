@@ -1,0 +1,24 @@
+{
+  "name": "muslin-remotion",
+  "version": "1.0.0",
+  "description": "Remotion composition for Muslin cascade animation demo",
+  "private": true,
+  "scripts": {
+    "build": "tsc --noEmit",
+    "render": "remotion render src/index.ts CascadeDemo out/cascade-demo.mp4",
+    "studio": "remotion studio src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.291",
+    "remotion": "4.0.291",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "typescript": "5.4.5",
+    "@types/react": "18.3.3",
+    "@types/react-dom": "18.3.0"
+  }
+}
