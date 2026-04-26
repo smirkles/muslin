@@ -9,6 +9,7 @@ import { postMeasurements, gradePattern } from "../../lib/api";
 
 export function MeasurementsPanel() {
   const setMeasurementsResponse = useWizardStore((s) => s.setMeasurementsResponse);
+  const setMeasurements = useWizardStore((s) => s.setMeasurements);
   const setGradedPatternId = useWizardStore((s) => s.setGradedPatternId);
   const setActiveTool = useWizardStore((s) => s.setActiveTool);
   const patternId = useWizardStore((s) => s.patternId);
@@ -23,6 +24,7 @@ export function MeasurementsPanel() {
     try {
       const result = await postMeasurements(measurements);
       setMeasurementsResponse(result);
+      setMeasurements(measurements); // raw values drive body morph targets
 
       const graded = await gradePattern(patternId!, result.measurement_id);
       setGradedPatternId(graded.graded_pattern_id);

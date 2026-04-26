@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import {
   AmbientLight,
   Box3,
@@ -61,6 +61,11 @@ function computeInfluences(
   return result;
 }
 
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const DEFAULT_CAM = { x: 0, y: 0.85, z: 2.2 } as const;
+const DEFAULT_TARGET = { x: 0, y: 0.85, z: 0 } as const;
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 interface BodyViewerProps {
@@ -77,22 +82,43 @@ export function BodyViewer({ measurements, gender, onGenderChange, className }: 
   const [status, setStatus] = useState<ViewerStatus>("loading");
 
   const rendererRef = useRef<WebGLRenderer | null>(null);
+  const cameraRef = useRef<PerspectiveCamera | null>(null);
   const controlsRef = useRef<InstanceType<typeof OrbitControls> | null>(null);
   const animFrameRef = useRef<number>(0);
   // Keep mesh reference so morph influences can be updated without reloading
   const meshRef = useRef<Mesh | null>(null);
+
+  const handleResetView = useCallback(() => {
+    const controls = controlsRef.current;
+    const camera = cameraRef.current;
+    if (!controls || !camera) return;
+    camera.position.set(DEFAULT_CAM.x, DEFAULT_CAM.y, DEFAULT_CAM.z);
+    camera.lookAt(DEFAULT_TARGET.x, DEFAULT_TARGET.y, DEFAULT_TARGET.z);
+    controls.target.set(DEFAULT_TARGET.x, DEFAULT_TARGET.y, DEFAULT_TARGET.z);
+    controls.autoRotate = true;
+    controls.update();
+  }, []);
 
   // ── Load model whenever gender changes ──────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
     setStatus("loading");
 
-    // Dispose previous renderer if any
+    // Dispose previous renderer + geometry/materials to avoid memory leaks
     cancelAnimationFrame(animFrameRef.current);
+    if (meshRef.current) {
+      if (Array.isArray(meshRef.current.material)) {
+        meshRef.current.material.forEach((m) => m.dispose());
+      } else {
+        (meshRef.current.material as MeshStandardMaterial).dispose();
+      }
+      meshRef.current.geometry.dispose();
+    }
     controlsRef.current?.dispose();
     rendererRef.current?.dispose();
     controlsRef.current = null;
     rendererRef.current = null;
+    cameraRef.current = null;
     meshRef.current = null;
     if (containerRef.current) containerRef.current.innerHTML = "";
 
@@ -106,6 +132,7 @@ export function BodyViewer({ measurements, gender, onGenderChange, className }: 
 
         const scene = new Scene();
         const camera = new PerspectiveCamera(40, w / h, 0.01, 100);
+        cameraRef.current = camera;
 
         const renderer = new WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(w, h);
@@ -173,9 +200,9 @@ export function BodyViewer({ measurements, gender, onGenderChange, className }: 
         });
 
         // Position camera to frame the body
-        camera.position.set(0, 0.85, 2.2);
-        camera.lookAt(0, 0.85, 0);
-        controls.target.set(0, 0.85, 0);
+        camera.position.set(DEFAULT_CAM.x, DEFAULT_CAM.y, DEFAULT_CAM.z);
+        camera.lookAt(DEFAULT_TARGET.x, DEFAULT_TARGET.y, DEFAULT_TARGET.z);
+        controls.target.set(DEFAULT_TARGET.x, DEFAULT_TARGET.y, DEFAULT_TARGET.z);
         controls.update();
 
         // Apply initial morph influences from current measurements
@@ -197,13 +224,24 @@ export function BodyViewer({ measurements, gender, onGenderChange, className }: 
     return () => {
       cancelled = true;
       cancelAnimationFrame(animFrameRef.current);
+      if (meshRef.current) {
+        if (Array.isArray(meshRef.current.material)) {
+          meshRef.current.material.forEach((m) => m.dispose());
+        } else {
+          (meshRef.current.material as MeshStandardMaterial).dispose();
+        }
+        meshRef.current.geometry.dispose();
+      }
       controlsRef.current?.dispose();
       rendererRef.current?.dispose();
       controlsRef.current = null;
       rendererRef.current = null;
+      cameraRef.current = null;
       meshRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally omit
+  // `measurements`: morph updates run in the dedicated effect below so the
+  // heavy model reload only fires on gender change, not every keystroke.
   }, [gender]);
 
   // ── Update morph influences when measurements change (no reload) ────────────
@@ -225,42 +263,66 @@ export function BodyViewer({ measurements, gender, onGenderChange, className }: 
 
       {/* Status overlays */}
       {status === "loading" && (
-        <div className="absolute inset-0 flex items-center justify-center">
+        <div
+          role="status"
+          data-testid="body-viewer-loading"
+          className="absolute inset-0 flex items-center justify-center"
+        >
           <div className="text-xs text-gray-400 animate-pulse">Loading body model…</div>
         </div>
       )}
       {status === "error" && (
-        <div className="absolute inset-0 flex items-center justify-center px-4 text-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 px-4 text-center">
           <p className="text-xs text-gray-400">Couldn&apos;t load 3D body</p>
+          <button
+            type="button"
+            onClick={() => setStatus("loading")}
+            className="text-xs text-sky-500 underline hover:text-sky-700"
+          >
+            Retry
+          </button>
         </div>
       )}
 
-      {/* Gender toggle — bottom-right corner */}
+      {/* Controls — visible once loaded */}
       {status === "success" && (
-        <div className="absolute bottom-2 right-2 flex rounded-lg overflow-hidden border border-gray-200 text-[11px] font-semibold shadow-sm">
+        <>
+          {/* Reset view — bottom-left */}
           <button
             type="button"
-            onClick={() => onGenderChange("female")}
-            className={`px-2.5 py-1 transition-colors ${
-              gender === "female"
-                ? "bg-rose-500 text-white"
-                : "bg-white text-gray-400 hover:bg-gray-50"
-            }`}
+            data-testid="body-viewer-reset"
+            onClick={handleResetView}
+            className="absolute bottom-2 left-2 text-[10px] text-gray-400 bg-white/80 border border-gray-200 rounded-md px-2 py-1 hover:text-gray-600 transition-colors shadow-sm"
           >
-            F
+            Reset view
           </button>
-          <button
-            type="button"
-            onClick={() => onGenderChange("male")}
-            className={`px-2.5 py-1 transition-colors ${
-              gender === "male"
-                ? "bg-sky-500 text-white"
-                : "bg-white text-gray-400 hover:bg-gray-50"
-            }`}
-          >
-            M
-          </button>
-        </div>
+
+          {/* Gender toggle — bottom-right */}
+          <div className="absolute bottom-2 right-2 flex rounded-lg overflow-hidden border border-gray-200 text-[11px] font-semibold shadow-sm">
+            <button
+              type="button"
+              onClick={() => onGenderChange("female")}
+              className={`px-2.5 py-1 transition-colors ${
+                gender === "female"
+                  ? "bg-rose-500 text-white"
+                  : "bg-white text-gray-400 hover:bg-gray-50"
+              }`}
+            >
+              F
+            </button>
+            <button
+              type="button"
+              onClick={() => onGenderChange("male")}
+              className={`px-2.5 py-1 transition-colors ${
+                gender === "male"
+                  ? "bg-sky-500 text-white"
+                  : "bg-white text-gray-400 hover:bg-gray-50"
+              }`}
+            >
+              M
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
