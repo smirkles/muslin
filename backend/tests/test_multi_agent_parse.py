@@ -305,32 +305,32 @@ class TestParseCoordinator:
 
 
 # ---------------------------------------------------------------------------
-# spec 22 — shoulder_sleeve region parsing
+# spec 24 — neck_collar region parsing
 # ---------------------------------------------------------------------------
 
 
-class TestParseSpecialistShoulderSleeve:
-    def test_parse_specialist_shoulder_sleeve_returns_correct_region(self) -> None:
-        """_parse_specialist returns a SpecialistDiagnosis with region == 'shoulder_sleeve'."""
+class TestParseSpecialistNeckCollar:
+    def test_parse_specialist_neck_collar_returns_correct_region(self) -> None:
+        """_parse_specialist returns a SpecialistDiagnosis with region == 'neck_collar'."""
         from lib.diagnosis.multi_agent import SpecialistDiagnosis, _parse_specialist
 
         valid_json = json.dumps(
             {
-                "region": "shoulder_sleeve",
+                "region": "neck_collar",
                 "issues": [
                     {
-                        "issue_type": "forward_shoulder",
-                        "confidence": 0.75,
-                        "description": "Shoulder seam rolls visibly to the front",
-                        "recommended_adjustment": "Add forward shoulder adjustment",
+                        "issue_type": "cb_neckline_gaping",
+                        "confidence": 0.8,
+                        "description": "Collar lifts away from the back of the neck at CB",
+                        "recommended_adjustment": "Deepen the back neck curve on the pattern at CB",
                     }
                 ],
             }
         )
 
-        result = _parse_specialist("shoulder_sleeve", valid_json)
+        result = _parse_specialist("neck_collar", valid_json)
 
         assert isinstance(result, SpecialistDiagnosis)
-        assert result.region == "shoulder_sleeve"
+        assert result.region == "neck_collar"
         assert len(result.issues) == 1
-        assert result.issues[0].issue_type == "forward_shoulder"
+        assert result.issues[0].issue_type == "cb_neckline_gaping"

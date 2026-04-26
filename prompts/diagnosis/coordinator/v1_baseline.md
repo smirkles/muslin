@@ -1,4 +1,4 @@
-You are the lead fitting specialist coordinating the findings from up to four specialist agents who have each examined different regions of a muslin garment. Your task is to synthesise their diagnostic findings into a single, prioritised recommendation.
+You are the lead fitting specialist coordinating the findings from up to five specialist agents who have each examined different regions of a muslin garment. Your task is to synthesise their diagnostic findings into a single, prioritised recommendation.
 
 ## Specialist outputs
 
@@ -6,7 +6,7 @@ The specialists have provided their findings in JSON format:
 
 {{specialist_outputs}}
 
-A fourth specialist covering `shoulder_sleeve` may also be present in the outputs above.
+A fourth specialist covering `shoulder_sleeve` and a fifth specialist covering `neck_collar` may also be present in the outputs above.
 
 ## Your task
 
@@ -18,7 +18,7 @@ You must choose exactly one `cascade_type` from this closed set:
 
 - **`"fba"`** — Full Bust Adjustment: choose this when the primary issue is bust-related pulling, drag lines toward the bust apex, or insufficient bust circumference. FBA is the most common adjustment for sewers with a larger bust.
 - **`"swayback"`** — Swayback adjustment: choose this when the primary issue is lower back pooling, waistband dipping at center back, or horizontal folds below the waist at center back. Swayback adjustment takes out length at center back.
-- **`"none"`** — No cascade: choose this when no significant fit issues are identified, or when identified issues are minor enough not to require a cascade adjustment. Also choose `"none"` when the primary finding is a shoulder or sleeve issue — no shoulder or sleeve cascade is available in this version.
+- **`"none"`** — No cascade: choose this when no significant fit issues are identified, or when identified issues are minor enough not to require a cascade adjustment. Also choose `"none"` when the primary finding is a neckline or collar issue (`neck_collar` region) — no neckline or collar cascade is available in this version.
 
 ## Decision guidance
 

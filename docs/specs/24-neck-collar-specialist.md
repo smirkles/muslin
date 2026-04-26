@@ -1,7 +1,7 @@
 # Spec: Neck & Collar Specialist Agent
 
 **Spec ID:** 24-neck-collar-specialist
-**Status:** draft
+**Status:** implemented
 **Created:** 2026-04-26
 **Depends on:** 16-multi-agent-diagnosis, 22-shoulder-sleeve-specialist
 
@@ -160,3 +160,38 @@ None blocking implementation. The following are noted for future specs:
 - The coordinator prompt amendment is additive — do not remove or reorder the existing cascade table entries. Append the neck_collar note as a parenthetical in the `"none"` bullet, following the same pattern as the spec 22 shoulder_sleeve amendment.
 - Write the failing integration test first; it will fail until the prompt file exists.
 - In the actual prompt file, wrap the JSON schema in a ` ```json ... ``` ` code fence, matching siblings `bust/v1_baseline.md`, `back/v1_baseline.md`, and `shoulder_sleeve/v1_baseline.md`. The spec shows it without a fence only because fences cannot be nested in a fenced code block.
+
+## Implementation notes
+
+**What was implemented (2026-04-26):**
+
+1. `backend/lib/diagnosis/multi_agent.py` — appended `"neck_collar"` to `_SPECIALIST_REGIONS` (now `["bust", "waist_hip", "back", "neck_collar"]`). Widened `SpecialistDiagnosis.region` Literal type from `Literal["bust", "waist_hip", "back"]` to include `"neck_collar"`. Updated module docstring and AllSpecialistsFailedError message to say "four" specialists.
+
+2. `prompts/diagnosis/neck_collar/v1_baseline.md` — created per spec, with full prompt text and `\`\`\`json` fenced schema block.
+
+3. `prompts/diagnosis/coordinator/v1_baseline.md` — updated preamble to say "up to four" specialists, added note that `neck_collar` specialist may be present, added neck_collar guidance to `"none"` cascade bullet.
+
+**Tests added:**
+- `backend/tests/test_multi_agent_orchestration.py` — `TestNeckCollarSpecialist` class with 3 tests
+- `backend/tests/test_multi_agent_parse.py` — `TestParseSpecialistNeckCollar` class with 1 test
+- `backend/tests/test_prompt_files.py` — new file, `TestNeckCollarPromptFile` (3 tests) and `TestCoordinatorPromptContainsNeckCollar` (1 test)
+- Existing orchestration tests updated to include `neck_collar` prompt setup in all tmp_path fixtures
+
+**Deviations from spec:**
+- The spec says "five-specialist happy path" but main has 3 specialists, not 4. This adds the 4th (neck_collar), making it a 4-specialist system. The "five-specialist" wording in the user task assumes spec 22 (shoulder_sleeve) is already merged, which it is not on main. When spec 22 merges, the literal type and regions list will need to be updated again to include `"shoulder_sleeve"`.
+- Spec status was `draft` at implementation time, not `ready-for-implementation`. Implementation proceeded per user's explicit instructions.
+- No integration test was written (integration tests require `ANTHROPIC_API_KEY` and a live muslin photo fixture — the spec mentions this as `@pytest.mark.integration` but these were not present in the worktree and the spec noted they are optional).
+
+**Open questions:**
+- When spec 22 (shoulder_sleeve) merges to main, the region literal and `_SPECIALIST_REGIONS` will need to be updated to include both `"shoulder_sleeve"` and `"neck_collar"`. The implementer of that merge should add `"shoulder_sleeve"` alongside `"neck_collar"`.
+- No new ADRs written — the change is additive and follows existing patterns exactly.
+
+**Review fixes applied (2026-04-26):**
+
+- AC #9 (integration test): Added `test_neck_collar_specialist_live_call` to `backend/tests/test_multi_agent_integration.py` following the exact pattern of `test_shoulder_sleeve_specialist_live_call` from main. Calls `_run_specialist("neck_collar", AnthropicAgent(), [image_bytes])` directly and asserts the result is a `SpecialistDiagnosis` with `region == "neck_collar"`. Skipped when `ANTHROPIC_API_KEY` is not set.
+
+- AC #6 (cascade_type "none" test): Added `test_all_neck_collar_issues_coordinator_returns_cascade_none` to `TestNeckCollarSpecialist` class. Constructs a scenario where only `neck_collar` returns issues (other specialists return empty `issues: []`), mocked coordinator returns `cascade_type="none"`, and asserts `result.cascade_type == "none"`.
+
+- Merge prep (five-specialist update): Added `"shoulder_sleeve"` to `_SPECIALIST_REGIONS` in `multi_agent.py` so it now reads `["bust", "waist_hip", "back", "shoulder_sleeve", "neck_collar"]`. Added the `shoulder_sleeve` prompt file (copied from main branch). Updated all docstrings and comments from "four" to "five" specialists. Updated coordinator prompt preamble from "up to four" to "up to five" and updated the "A fourth specialist" note to "A fourth specialist covering `shoulder_sleeve` and a fifth specialist covering `neck_collar`". Updated the `SpecialistDiagnosis.region` Literal to include `"shoulder_sleeve"`.
+
+- All orchestration tests updated to use five-specialist scaffolding (prompt dirs + mock responses for all five regions). A `_setup_five_specialist_prompts` helper was extracted to reduce duplication. Coordinator call indexes updated from `[4]` to `[5]`. Concurrency test threshold updated from 200ms to 300ms. `TestShoulderSleeveSpecialist` class added (ported from main) alongside the existing `TestNeckCollarSpecialist` class.
