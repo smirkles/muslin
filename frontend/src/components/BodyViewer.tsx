@@ -440,10 +440,11 @@ function buildUnderwearGroup(
   const halfApex = clamp((apexToApex / 2)             * spc, 0.03 * s, 0.11 * s);
 
   // Y positions as fractions of actual body height, offset from actual foot position
-  const crotchY    = footY + 0.44 * bodyH;
-  const hipFullY   = footY + 0.51 * bodyH;
-  const underbustY = footY + 0.69 * bodyH;
-  const bustY      = footY + 0.72 * bodyH;
+  // Calibrated against bodyapps-viz model vertex distribution
+  const crotchY    = footY + 0.36 * bodyH;
+  const hipFullY   = footY + 0.43 * bodyH;
+  const underbustY = footY + 0.58 * bodyH;
+  const bustY      = footY + 0.61 * bodyH;
 
   const mat = new MeshStandardMaterial({
     color: gender === "female" ? 0xc8a8c0 : 0x8fb3cc,
@@ -454,7 +455,7 @@ function buildUnderwearGroup(
   // Briefs: from crotch up to hip fullness
   const pantsH = (hipFullY - crotchY) + 0.04 * s;
   const pants = new Mesh(
-    new CylinderGeometry(waistR * 1.01, hipR * 1.01, pantsH, 32),
+    new CylinderGeometry(hipR, hipR, pantsH, 32),
     mat,
   );
   pants.position.y = crotchY + pantsH / 2;
