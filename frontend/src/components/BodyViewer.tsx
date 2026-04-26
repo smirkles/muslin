@@ -238,19 +238,6 @@ export function BodyViewer({ measurements, gender, onGenderChange, className }: 
           console.log("[BodyViewer] body bounds", { footY, bodyH });
         }
 
-        // ── DEBUG: Y-axis reference markers — offset to left side so they're visible
-        // red=Y:0 (feet), green=Y:0.85 (navel), blue=Y:1.7 (head); dev only
-        if (process.env.NODE_ENV === "development") {
-          const dg = new SphereGeometry(0.06, 10, 8);
-          const mkR = new Mesh(dg, new MeshStandardMaterial({ color: 0xff2222 }));
-          const mkG = new Mesh(dg, new MeshStandardMaterial({ color: 0x22dd22 }));
-          const mkB = new Mesh(dg, new MeshStandardMaterial({ color: 0x2244ff }));
-          mkR.position.set(-0.5, 0,    0);
-          mkG.position.set(-0.5, 0.85, 0);
-          mkB.position.set(-0.5, 1.7,  0);
-          scene.add(mkR); scene.add(mkG); scene.add(mkB);
-        }
-        // ── END DEBUG ────────────────────────────────────────────────────────
 
         // Remove any underwear the measurements effect might have race-added
         // before this async load completed (sceneRef was set before GLB loaded)
@@ -443,13 +430,14 @@ function buildUnderwearGroup(
   const bust       = measurements?.bust_cm      ?? 92;
   const apexToApex = measurements?.apex_to_apex_cm ?? 18.5;
 
-  // scene units per cm — derived from actual body height, not assumed 1.7
-  const spc = bodyH / height;
-  // Scale the clamp bounds proportionally so they work at any body height
+  // scene units per cm, then scaled down by 0.60 — the bodyapps-viz model is
+  // proportionally slimmer than real-world measurements, so raw circumference math
+  // overestimates the visual radius by ~40%.
+  const spc = (bodyH / height) * 0.60;
   const s = bodyH / 1.7;
-  const hipR    = clamp((hip        / (2 * Math.PI)) * spc, 0.06 * s, 0.22 * s);
-  const bustR   = clamp((bust       / (2 * Math.PI)) * spc, 0.05 * s, 0.20 * s);
-  const halfApex = clamp((apexToApex / 2)             * spc, 0.03 * s, 0.11 * s);
+  const hipR    = clamp((hip        / (2 * Math.PI)) * spc, 0.035 * s, 0.13 * s);
+  const bustR   = clamp((bust       / (2 * Math.PI)) * spc, 0.030 * s, 0.12 * s);
+  const halfApex = clamp((apexToApex / 2)             * spc, 0.015 * s, 0.065 * s);
 
   // Standard anatomical fractions of body height from floor
   const crotchY    = footY + 0.46 * bodyH;
