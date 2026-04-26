@@ -45,6 +45,7 @@ interface WizardState {
   photoIds: string[];
   diagnosisResult: DiagnosisResult | null;
   cascadeScript: CascadeScript | null;
+  currentStepIndex: number;
   activeTool: ToolId | null;
 
   setPatternId: (id: string) => void;
@@ -55,6 +56,7 @@ interface WizardState {
   setPhotoIds: (ids: string[]) => void;
   setDiagnosisResult: (r: DiagnosisResult) => void;
   setCascadeScript: (s: CascadeScript) => void;
+  setCurrentStepIndex: (i: number) => void;
   setActiveTool: (tool: ToolId | null) => void;
   reset: () => void;
 }
@@ -68,6 +70,7 @@ const initialState = {
   photoIds: [],
   diagnosisResult: null,
   cascadeScript: null,
+  currentStepIndex: 0,
   activeTool: null,
 };
 
@@ -81,6 +84,7 @@ export const useWizardStore = create<WizardState>()((set) => ({
   setPhotoIds: (ids) => set({ photoIds: ids }),
   setDiagnosisResult: (r) => set({ diagnosisResult: r }),
   setCascadeScript: (s) => set({ cascadeScript: s }),
+  setCurrentStepIndex: (i) => set({ currentStepIndex: i }),
   setActiveTool: (tool) => set({ activeTool: tool }),
   reset: () => set(initialState),
 }));
