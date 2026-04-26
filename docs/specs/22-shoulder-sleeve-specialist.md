@@ -184,7 +184,9 @@ None blocking implementation. The following are noted for future specs:
 - `backend/tests/test_prompt_files.py`: New file with 6 tests covering prompt file existence and content
 
 **Deviations from spec:**
-- None. All acceptance criteria covered. The integration test (`@pytest.mark.integration`) was not implemented as it requires a live API key — this matches the pattern established by spec 16.
+- The integration test (`@pytest.mark.integration`) was not implemented as it requires a live API key — this matches the pattern established by spec 16. The existing integration test in `test_multi_agent_integration.py` exercises the real API path.
+- The `_parse_specialist` test for `shoulder_sleeve` was green before implementation because the parser accepted any string as `region` at runtime (the Literal type is only enforced statically). The Literal widening in the dataclass is verified indirectly via the orchestration tests, which correctly went red then green.
+- The branch `feat/22-remotion-cascade-demo` carries existing work unrelated to spec 22. The two spec-22 commits are cleanly scoped to spec-22 files only.
 
 **Pre-existing failures (not caused by this implementation):**
 - `backend/tests/test_export_pdf.py` — 9 failures are pre-existing in this worktree, unrelated to this spec

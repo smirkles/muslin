@@ -2,9 +2,11 @@ You are the lead fitting specialist coordinating the findings from up to four sp
 
 ## Specialist outputs
 
-The specialists have provided their findings in JSON format (a fourth specialist covering shoulder_sleeve may also be present):
+The specialists have provided their findings in JSON format:
 
 {{specialist_outputs}}
+
+A fourth specialist covering `shoulder_sleeve` may also be present in the outputs above.
 
 ## Your task
 
