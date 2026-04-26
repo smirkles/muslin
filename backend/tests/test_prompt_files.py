@@ -7,8 +7,6 @@ These tests verify that required prompt files exist and contain no unresolved
 import re
 from pathlib import Path
 
-import pytest
-
 # Repo root — prompts/ directory lives two levels above backend/
 _REPO_ROOT = Path(__file__).parent.parent.parent
 _PROMPTS_ROOT = _REPO_ROOT / "prompts"
@@ -65,6 +63,6 @@ class TestCoordinatorPromptContainsShoulderSleeve:
         """Coordinator prompt mentions 'four' specialists (updated from three)."""
         prompt_path = _PROMPTS_ROOT / "diagnosis" / "coordinator" / "v1_baseline.md"
         content = prompt_path.read_text(encoding="utf-8")
-        assert "four" in content, (
-            "coordinator prompt should say 'four' (or 'up to four') specialists"
-        )
+        assert (
+            "four" in content
+        ), "coordinator prompt should say 'four' (or 'up to four') specialists"
