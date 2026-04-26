@@ -238,17 +238,17 @@ export function BodyViewer({ measurements, gender, onGenderChange, className }: 
           console.log("[BodyViewer] body bounds", { footY, bodyH });
         }
 
-        // ── DEBUG: reference spheres to verify world-space coordinate mapping ──
-        // red=feet(0), green=navel(0.85), blue=head(1.7); remove once confirmed
+        // ── DEBUG: Y-axis reference markers — offset to left side so they're visible
+        // red=Y:0 (feet), green=Y:0.85 (navel), blue=Y:1.7 (head); dev only
         if (process.env.NODE_ENV === "development") {
-          const debugSphereGeo = new SphereGeometry(0.03, 8, 8);
-          const red   = new Mesh(debugSphereGeo, new MeshStandardMaterial({ color: 0xff0000 }));
-          const green = new Mesh(debugSphereGeo, new MeshStandardMaterial({ color: 0x00cc00 }));
-          const blue  = new Mesh(debugSphereGeo, new MeshStandardMaterial({ color: 0x0044ff }));
-          red.position.set(0, 0, 0);
-          green.position.set(0, 0.85, 0);
-          blue.position.set(0, 1.7, 0);
-          scene.add(red); scene.add(green); scene.add(blue);
+          const dg = new SphereGeometry(0.06, 10, 8);
+          const mkR = new Mesh(dg, new MeshStandardMaterial({ color: 0xff2222 }));
+          const mkG = new Mesh(dg, new MeshStandardMaterial({ color: 0x22dd22 }));
+          const mkB = new Mesh(dg, new MeshStandardMaterial({ color: 0x2244ff }));
+          mkR.position.set(-0.5, 0,    0);
+          mkG.position.set(-0.5, 0.85, 0);
+          mkB.position.set(-0.5, 1.7,  0);
+          scene.add(mkR); scene.add(mkG); scene.add(mkB);
         }
         // ── END DEBUG ────────────────────────────────────────────────────────
 
@@ -441,7 +441,6 @@ function buildUnderwearGroup(
   const height     = measurements?.height_cm    ?? 168;
   const hip        = measurements?.hip_cm       ?? 99;
   const bust       = measurements?.bust_cm      ?? 92;
-  const waist      = measurements?.waist_cm     ?? 74;
   const apexToApex = measurements?.apex_to_apex_cm ?? 18.5;
 
   // scene units per cm — derived from actual body height, not assumed 1.7
@@ -449,16 +448,22 @@ function buildUnderwearGroup(
   // Scale the clamp bounds proportionally so they work at any body height
   const s = bodyH / 1.7;
   const hipR    = clamp((hip        / (2 * Math.PI)) * spc, 0.06 * s, 0.22 * s);
-  const waistR  = clamp((waist      / (2 * Math.PI)) * spc, 0.05 * s, 0.18 * s);
   const bustR   = clamp((bust       / (2 * Math.PI)) * spc, 0.05 * s, 0.20 * s);
   const halfApex = clamp((apexToApex / 2)             * spc, 0.03 * s, 0.11 * s);
 
-  // Y positions as fractions of actual body height, offset from actual foot position
-  // Calibrated against bodyapps-viz model vertex distribution
-  const crotchY    = footY + 0.36 * bodyH;
-  const hipFullY   = footY + 0.43 * bodyH;
-  const underbustY = footY + 0.58 * bodyH;
-  const bustY      = footY + 0.61 * bodyH;
+  // Standard anatomical fractions of body height from floor
+  const crotchY    = footY + 0.46 * bodyH;
+  const hipFullY   = footY + 0.53 * bodyH;
+  const underbustY = footY + 0.64 * bodyH;
+  const bustY      = footY + 0.67 * bodyH;
+
+  if (process.env.NODE_ENV === "development") {
+    // eslint-disable-next-line no-console
+    console.log("[underwear] footY=%o bodyH=%o hipR=%o bustR=%o crotchY=%o bustY=%o",
+      footY.toFixed(3), bodyH.toFixed(3),
+      hipR.toFixed(3), bustR.toFixed(3),
+      crotchY.toFixed(3), bustY.toFixed(3));
+  }
 
   const mat = new MeshStandardMaterial({
     color: gender === "female" ? 0xc8a8c0 : 0x8fb3cc,
