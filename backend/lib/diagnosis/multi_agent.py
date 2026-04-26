@@ -1,6 +1,6 @@
 """Multi-agent fit diagnosis orchestrator.
 
-Fans out to three specialist agents (bust, waist/hip, back) concurrently,
+Fans out to four specialist agents (bust, waist/hip, back, neck/collar) concurrently,
 then synthesises their outputs via a coordinator agent into a DiagnosisResult.
 
 No FastAPI imports — this is pure lib/ code.
@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 # Default root for prompt files (two levels above backend/, then prompts/)
 _PROMPTS_ROOT = Path(__file__).parent.parent.parent.parent / "prompts"
 
-# The three specialist regions run in this order
-_SPECIALIST_REGIONS: list[str] = ["bust", "waist_hip", "back"]
+# The four specialist regions run in this order
+_SPECIALIST_REGIONS: list[str] = ["bust", "waist_hip", "back", "neck_collar"]
 
 # Valid cascade types (closed set — coordinator must return one of these)
 _VALID_CASCADE_TYPES = frozenset({"fba", "swayback", "none"})
@@ -71,7 +71,7 @@ class Issue:
 class SpecialistDiagnosis:
     """Output from a single specialist agent."""
 
-    region: Literal["bust", "waist_hip", "back"]
+    region: Literal["bust", "waist_hip", "back", "neck_collar"]
     """The body region this specialist examined."""
 
     issues: list[Issue]
@@ -285,7 +285,7 @@ async def run_diagnosis(
 ) -> DiagnosisResult:
     """Run multi-agent fit diagnosis on the provided images.
 
-    Fans out to three specialist agents (bust, waist/hip, back) concurrently via
+    Fans out to four specialist agents (bust, waist/hip, back, neck/collar) concurrently via
     asyncio.gather + asyncio.to_thread, then runs a coordinator agent to synthesise
     the results.
 
@@ -303,7 +303,7 @@ async def run_diagnosis(
         AllSpecialistsFailedError: If all specialist agents fail.
         CoordinatorParseError: If the coordinator returns an unparseable response.
     """
-    # Fan out three specialists concurrently
+    # Fan out four specialists concurrently
     specialist_tasks = [
         asyncio.to_thread(_run_specialist, region, agent_factory(), images)
         for region in _SPECIALIST_REGIONS
@@ -320,7 +320,7 @@ async def run_diagnosis(
 
     if not survivors:
         raise AllSpecialistsFailedError(
-            "All three specialist agents failed — cannot produce a diagnosis"
+            "All four specialist agents failed — cannot produce a diagnosis"
         )
 
     # Serialise survivors for coordinator
