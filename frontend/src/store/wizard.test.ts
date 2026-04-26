@@ -24,9 +24,9 @@ describe("useWizardStore", () => {
     expect(state.measurementsResponse).toBeNull();
   });
 
-  it("has patternId pre-loaded to the hackathon pattern in initial state", () => {
+  it("has patternId as null in initial state (user must select from picker)", () => {
     const state = useWizardStore.getState();
-    expect(state.patternId).toBe("bodice-classic");
+    expect(state.patternId).toBeNull();
   });
 
   it("setMeasurementsResponse stores the response", () => {
@@ -40,10 +40,10 @@ describe("useWizardStore", () => {
     expect(useWizardStore.getState().measurementsResponse).toBeNull();
   });
 
-  it("reset restores patternId to the pre-loaded hackathon pattern", () => {
-    useWizardStore.getState().setPatternId("some-other-pattern");
+  it("reset clears patternId back to null", () => {
+    useWizardStore.getState().setPatternId("bodice-v1");
     useWizardStore.getState().reset();
-    expect(useWizardStore.getState().patternId).toBe("bodice-classic");
+    expect(useWizardStore.getState().patternId).toBeNull();
   });
 
   it("has currentStepIndex as 0 in initial state", () => {

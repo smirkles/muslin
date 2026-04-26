@@ -62,7 +62,7 @@ interface WizardState {
 }
 
 const initialState = {
-  patternId: "bodice-classic",  // pre-load the single hackathon pattern
+  patternId: null as string | null,
   gradedPatternId: null,
   measurementsResponse: null,
   measurements: null,
