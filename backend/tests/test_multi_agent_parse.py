@@ -302,3 +302,35 @@ class TestParseCoordinator:
         )
         with pytest.raises(CoordinatorParseError):
             _parse_coordinator(text)
+
+
+# ---------------------------------------------------------------------------
+# spec 22 — shoulder_sleeve region parsing
+# ---------------------------------------------------------------------------
+
+
+class TestParseSpecialistShoulderSleeve:
+    def test_parse_specialist_shoulder_sleeve_returns_correct_region(self) -> None:
+        """_parse_specialist returns a SpecialistDiagnosis with region == 'shoulder_sleeve'."""
+        from lib.diagnosis.multi_agent import SpecialistDiagnosis, _parse_specialist
+
+        valid_json = json.dumps(
+            {
+                "region": "shoulder_sleeve",
+                "issues": [
+                    {
+                        "issue_type": "forward_shoulder",
+                        "confidence": 0.75,
+                        "description": "Shoulder seam rolls visibly to the front",
+                        "recommended_adjustment": "Add forward shoulder adjustment",
+                    }
+                ],
+            }
+        )
+
+        result = _parse_specialist("shoulder_sleeve", valid_json)
+
+        assert isinstance(result, SpecialistDiagnosis)
+        assert result.region == "shoulder_sleeve"
+        assert len(result.issues) == 1
+        assert result.issues[0].issue_type == "forward_shoulder"
