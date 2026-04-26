@@ -238,6 +238,20 @@ export function BodyViewer({ measurements, gender, onGenderChange, className }: 
           console.log("[BodyViewer] body bounds", { footY, bodyH });
         }
 
+        // ── DEBUG: reference spheres to verify world-space coordinate mapping ──
+        // red=feet(0), green=navel(0.85), blue=head(1.7); remove once confirmed
+        if (process.env.NODE_ENV === "development") {
+          const debugSphereGeo = new SphereGeometry(0.03, 8, 8);
+          const red   = new Mesh(debugSphereGeo, new MeshStandardMaterial({ color: 0xff0000 }));
+          const green = new Mesh(debugSphereGeo, new MeshStandardMaterial({ color: 0x00cc00 }));
+          const blue  = new Mesh(debugSphereGeo, new MeshStandardMaterial({ color: 0x0044ff }));
+          red.position.set(0, 0, 0);
+          green.position.set(0, 0.85, 0);
+          blue.position.set(0, 1.7, 0);
+          scene.add(red); scene.add(green); scene.add(blue);
+        }
+        // ── END DEBUG ────────────────────────────────────────────────────────
+
         // Remove any underwear the measurements effect might have race-added
         // before this async load completed (sceneRef was set before GLB loaded)
         if (underwearGroupRef.current) {
