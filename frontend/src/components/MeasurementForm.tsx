@@ -5,6 +5,7 @@ import {
   type Measurements,
   FIELD_META,
   FIELD_ORDER,
+  UK_AUS_SIZES,
   validateMeasurements,
 } from "../lib/measurements";
 
@@ -98,6 +99,22 @@ export function MeasurementForm({
     setClientErrors((prev) => ({ ...prev, [field]: errs[field] }));
   }
 
+  function handleSizeSelect(e: React.ChangeEvent<HTMLSelectElement>) {
+    const idx = parseInt(e.target.value, 10);
+    if (isNaN(idx)) return;
+    const { measurements } = UK_AUS_SIZES[idx];
+    const next: FieldValues = {} as FieldValues;
+    const allTouched: Touched = {} as Touched;
+    for (const key of FIELD_ORDER) {
+      next[key] = String(measurements[key]);
+      allTouched[key] = true;
+    }
+    setValues(next);
+    setTouched(allTouched);
+    setClientErrors(validateMeasurements(measurements) as FieldErrors);
+    setDismissedServerErrors(new Set());
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const parsed = parseValues(values);
@@ -112,6 +129,27 @@ export function MeasurementForm({
 
   return (
     <form onSubmit={handleSubmit} noValidate className="space-y-5">
+      <div className="flex flex-col gap-1">
+        <label htmlFor="standard-size" className="text-sm font-medium text-gray-700">
+          Quick fill from standard size
+        </label>
+        <select
+          id="standard-size"
+          defaultValue=""
+          disabled={isLoading}
+          onChange={handleSizeSelect}
+          className="w-full rounded border border-gray-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:bg-gray-50 disabled:text-gray-400"
+        >
+          <option value="" disabled>Select a UK / Aus size…</option>
+          {UK_AUS_SIZES.map((size, idx) => (
+            <option key={size.label} value={idx}>{size.label}</option>
+          ))}
+        </select>
+        <p className="text-xs text-gray-500">
+          Fills in standard measurements — you can adjust any field below before submitting.
+        </p>
+      </div>
+      <hr className="border-gray-200" />
       {FIELD_ORDER.map((field) => {
         const meta = FIELD_META[field];
         const error = getDisplayError(field);
