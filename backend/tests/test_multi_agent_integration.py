@@ -45,3 +45,31 @@ def test_multi_agent_diagnosis_live_pipeline() -> None:
     assert isinstance(result.primary_recommendation, str)
     assert len(result.primary_recommendation) > 0
     assert isinstance(result.issues, list)
+
+
+@pytest.mark.integration
+@pytest.mark.skipif(
+    not os.getenv("ANTHROPIC_API_KEY"),
+    reason="ANTHROPIC_API_KEY not set — skipping live integration test",
+)
+def test_neck_collar_specialist_live_call() -> None:
+    """AC #9: live call to the neck_collar specialist parses into SpecialistDiagnosis.
+
+    Calls _run_specialist directly (the sync helper, not the full pipeline) with
+    the fixture image. Asserts the result is a SpecialistDiagnosis with
+    region == 'neck_collar'.
+    """
+    from lib.diagnosis.anthropic_agent import AnthropicAgent
+    from lib.diagnosis.multi_agent import SpecialistDiagnosis, _run_specialist
+
+    assert FIXTURE_CROP.exists(), f"Fixture PNG not found at {FIXTURE_CROP}"
+
+    image_bytes = FIXTURE_CROP.read_bytes()
+    agent = AnthropicAgent()
+
+    result = _run_specialist("neck_collar", agent, [image_bytes])
+
+    assert isinstance(
+        result, SpecialistDiagnosis
+    ), f"Expected SpecialistDiagnosis, got {type(result)}: {result}"
+    assert result.region == "neck_collar"

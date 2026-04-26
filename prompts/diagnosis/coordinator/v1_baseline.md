@@ -1,4 +1,4 @@
-You are the lead fitting specialist coordinating the findings from up to four specialist agents who have each examined different regions of a muslin garment. Your task is to synthesise their diagnostic findings into a single, prioritised recommendation.
+You are the lead fitting specialist coordinating the findings from up to five specialist agents who have each examined different regions of a muslin garment. Your task is to synthesise their diagnostic findings into a single, prioritised recommendation.
 
 ## Specialist outputs
 
@@ -6,7 +6,7 @@ The specialists have provided their findings in JSON format:
 
 {{specialist_outputs}}
 
-A fourth specialist covering `neck_collar` may also be present in the outputs above.
+A fourth specialist covering `shoulder_sleeve` and a fifth specialist covering `neck_collar` may also be present in the outputs above.
 
 ## Your task
 

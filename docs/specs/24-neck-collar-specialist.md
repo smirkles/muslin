@@ -185,3 +185,13 @@ None blocking implementation. The following are noted for future specs:
 **Open questions:**
 - When spec 22 (shoulder_sleeve) merges to main, the region literal and `_SPECIALIST_REGIONS` will need to be updated to include both `"shoulder_sleeve"` and `"neck_collar"`. The implementer of that merge should add `"shoulder_sleeve"` alongside `"neck_collar"`.
 - No new ADRs written — the change is additive and follows existing patterns exactly.
+
+**Review fixes applied (2026-04-26):**
+
+- AC #9 (integration test): Added `test_neck_collar_specialist_live_call` to `backend/tests/test_multi_agent_integration.py` following the exact pattern of `test_shoulder_sleeve_specialist_live_call` from main. Calls `_run_specialist("neck_collar", AnthropicAgent(), [image_bytes])` directly and asserts the result is a `SpecialistDiagnosis` with `region == "neck_collar"`. Skipped when `ANTHROPIC_API_KEY` is not set.
+
+- AC #6 (cascade_type "none" test): Added `test_all_neck_collar_issues_coordinator_returns_cascade_none` to `TestNeckCollarSpecialist` class. Constructs a scenario where only `neck_collar` returns issues (other specialists return empty `issues: []`), mocked coordinator returns `cascade_type="none"`, and asserts `result.cascade_type == "none"`.
+
+- Merge prep (five-specialist update): Added `"shoulder_sleeve"` to `_SPECIALIST_REGIONS` in `multi_agent.py` so it now reads `["bust", "waist_hip", "back", "shoulder_sleeve", "neck_collar"]`. Added the `shoulder_sleeve` prompt file (copied from main branch). Updated all docstrings and comments from "four" to "five" specialists. Updated coordinator prompt preamble from "up to four" to "up to five" and updated the "A fourth specialist" note to "A fourth specialist covering `shoulder_sleeve` and a fifth specialist covering `neck_collar`". Updated the `SpecialistDiagnosis.region` Literal to include `"shoulder_sleeve"`.
+
+- All orchestration tests updated to use five-specialist scaffolding (prompt dirs + mock responses for all five regions). A `_setup_five_specialist_prompts` helper was extracted to reduce duplication. Coordinator call indexes updated from `[4]` to `[5]`. Concurrency test threshold updated from 200ms to 300ms. `TestShoulderSleeveSpecialist` class added (ported from main) alongside the existing `TestNeckCollarSpecialist` class.
