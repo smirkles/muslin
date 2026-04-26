@@ -1,81 +1,83 @@
 /**
- * Tests for BodyViewer.tsx
+ * Tests for BodyViewer.tsx (spec 19 — Three.js morph-target body viewer)
  *
- * Three.js + jsdom is hostile — we mock all Three.js and GLTFLoader classes
- * extensively to avoid any real rendering attempts.
+ * The component takes measurements + gender props and animates a GLB body model
+ * via Three.js morph targets. Three.js and three-stdlib are fully mocked to
+ * avoid JSDOM / WebGL incompatibility.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach, Mock } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // ---------------------------------------------------------------------------
-// Mock fetchBodyMesh from api.ts
+// Shared mock objects (defined before vi.mock so factories can close over them)
 // ---------------------------------------------------------------------------
-vi.mock("../../lib/api", () => ({
-  fetchBodyMesh: vi.fn(),
-  postMeasurements: vi.fn(),
-  ApiValidationError: class ApiValidationError extends Error {},
-}));
 
-// ---------------------------------------------------------------------------
-// Mock three-stdlib (OrbitControls)
-// ---------------------------------------------------------------------------
-const mockAutoRotate = { value: false };
 const mockDispose = vi.fn();
 const mockUpdate = vi.fn();
-const mockOrbitControls = {
+const mockControls = {
   autoRotate: false,
+  enableDamping: false,
+  enablePan: false,
+  autoRotateSpeed: 0,
+  minDistance: 0,
+  maxDistance: 0,
   dispose: mockDispose,
   update: mockUpdate,
-  enableDamping: false,
+  target: { set: vi.fn() },
 };
 
-vi.mock("three-stdlib", () => ({
-  OrbitControls: vi.fn().mockImplementation(() => mockOrbitControls),
-  GLTFLoader: vi.fn().mockImplementation(() => ({
-    parse: vi.fn((buffer: ArrayBuffer, path: string, onLoad: (gltf: unknown) => void) => {
-      const mockScene = {
-        traverse: vi.fn(),
-      };
-      const mockMesh = {
-        isMesh: true,
-        geometry: { dispose: vi.fn() },
-        material: { dispose: vi.fn() },
-      };
-      onLoad({ scene: mockScene });
-    }),
-  })),
-}));
-
-// ---------------------------------------------------------------------------
-// Mock three
-// ---------------------------------------------------------------------------
-const mockSceneAdd = vi.fn();
 const mockRendererDispose = vi.fn();
 const mockRendererSetSize = vi.fn();
 const mockRendererSetPixelRatio = vi.fn();
 const mockRendererRender = vi.fn();
 const mockRendererDomElement = document.createElement("canvas");
 
-const mockScene = {
-  add: mockSceneAdd,
-  children: [],
-  traverse: vi.fn(),
+const mockSceneAdd = vi.fn();
+
+// Vector/Box mocks — y:1.7 so scale = targetHeight(1.7) / size.y(1.7) = 1 (safe)
+const mockVec3 = { x: 0, y: 1.7, z: 0 };
+const mockBox3 = {
+  setFromObject: vi.fn().mockReturnThis(),
+  getSize: vi.fn(),
+  getCenter: vi.fn(),
+  min: { y: 0 },
 };
 
-const mockCamera = {
-  aspect: 1,
-  updateProjectionMatrix: vi.fn(),
-  position: { set: vi.fn() },
-  lookAt: vi.fn(),
-};
+// ---------------------------------------------------------------------------
+// Mock three-stdlib
+// ---------------------------------------------------------------------------
 
-const mockAmbientLight = { isLight: true };
-const mockDirectionalLight = {
-  isLight: true,
-  position: { set: vi.fn() },
-};
+vi.mock("three-stdlib", () => ({
+  OrbitControls: vi.fn().mockImplementation(() => mockControls),
+  GLTFLoader: vi.fn().mockImplementation(() => ({
+    load: vi.fn(
+      (
+        _url: string,
+        onLoad: (gltf: {
+          scene: {
+            traverse: ReturnType<typeof vi.fn>;
+            scale: { setScalar: ReturnType<typeof vi.fn> };
+            position: { set: ReturnType<typeof vi.fn> };
+          };
+        }) => void,
+      ) => {
+        onLoad({
+          scene: {
+            traverse: vi.fn(),
+            scale: { setScalar: vi.fn() },
+            position: { set: vi.fn() },
+          },
+        });
+      },
+    ),
+  })),
+}));
+
+// ---------------------------------------------------------------------------
+// Mock three
+// ---------------------------------------------------------------------------
 
 vi.mock("three", () => ({
   WebGLRenderer: vi.fn().mockImplementation(() => ({
@@ -85,60 +87,66 @@ vi.mock("three", () => ({
     render: mockRendererRender,
     domElement: mockRendererDomElement,
   })),
-  Scene: vi.fn().mockImplementation(() => mockScene),
-  PerspectiveCamera: vi.fn().mockImplementation(() => mockCamera),
-  AmbientLight: vi.fn().mockImplementation(() => mockAmbientLight),
-  DirectionalLight: vi.fn().mockImplementation(() => mockDirectionalLight),
-  Color: vi.fn(),
+  Scene: vi.fn().mockImplementation(() => ({ add: mockSceneAdd })),
+  PerspectiveCamera: vi.fn().mockImplementation(() => ({
+    position: { set: vi.fn() },
+    lookAt: vi.fn(),
+  })),
+  AmbientLight: vi.fn().mockImplementation(() => ({})),
+  DirectionalLight: vi.fn().mockImplementation(() => ({
+    position: { set: vi.fn() },
+  })),
+  Box3: vi.fn().mockImplementation(() => mockBox3),
+  Vector3: vi.fn().mockImplementation(() => mockVec3),
+  Mesh: vi.fn(),
+  MeshStandardMaterial: vi.fn().mockImplementation(() => ({})),
+  Group: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
-// Import component AFTER mocks are set up
+// Import component AFTER mocks
 // ---------------------------------------------------------------------------
-import { BodyViewer } from "../BodyViewer";
-import { fetchBodyMesh } from "../../lib/api";
 
-const mockFetchBodyMesh = fetchBodyMesh as Mock;
+import { BodyViewer } from "../BodyViewer";
+import type { BodyGender } from "../../store/wizard";
+import { GLTFLoader } from "three-stdlib";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-const VALID_ARRAY_BUFFER = new ArrayBuffer(24);
-// Inject glTF magic bytes at start
-const view = new Uint8Array(VALID_ARRAY_BUFFER);
-view[0] = 0x67; // 'g'
-view[1] = 0x6c; // 'l'
-view[2] = 0x54; // 'T'
-view[3] = 0x46; // 'F'
+
+const DEFAULT_MEASUREMENTS = {
+  bust_cm: 96,
+  high_bust_cm: 85,
+  apex_to_apex_cm: 18,
+  waist_cm: 78,
+  hip_cm: 104,
+  height_cm: 168,
+  back_length_cm: 39.5,
+};
+
+function renderViewer(
+  measurements = DEFAULT_MEASUREMENTS,
+  gender: BodyGender = "female",
+  onGenderChange = vi.fn(),
+) {
+  return render(
+    <BodyViewer
+      measurements={measurements}
+      gender={gender}
+      onGenderChange={onGenderChange}
+    />,
+  );
+}
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockOrbitControls.autoRotate = false;
-  // Reset mock implementation
-  mockFetchBodyMesh.mockResolvedValue(VALID_ARRAY_BUFFER);
-
-  // Mock requestAnimationFrame to not actually loop
-  vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => {
-    // Don't actually call to avoid infinite loop
-    return 0;
-  });
+  mockControls.autoRotate = false;
+  vi.spyOn(window, "requestAnimationFrame").mockImplementation(() => 0);
   vi.spyOn(window, "cancelAnimationFrame").mockImplementation(() => {});
-
-  // Mock ResizeObserver
-  (global as Record<string, unknown>).ResizeObserver = vi.fn().mockImplementation(
-    (callback: ResizeObserverCallback) => ({
-      observe: vi.fn(),
-      unobserve: vi.fn(),
-      disconnect: vi.fn(),
-    }),
-  );
 });
 
 afterEach(() => {
-  // Do not use vi.restoreAllMocks() here — it calls mockRestore() on all vi.fn()
-  // mocks including those created inside vi.mock() factories, wiping their
-  // implementations and breaking tests that run after the first one.
-  // The rAF/cAF spies are re-created in beforeEach so no restore is needed.
   vi.clearAllMocks();
 });
 
@@ -148,180 +156,167 @@ afterEach(() => {
 
 describe("BodyViewer", () => {
   describe("loading state", () => {
-    it("shows loading indicator while fetching", async () => {
-      // Keep fetch pending
-      let resolveFetch!: (buf: ArrayBuffer) => void;
-      mockFetchBodyMesh.mockReturnValue(
-        new Promise<ArrayBuffer>((resolve) => {
-          resolveFetch = resolve;
-        }),
-      );
-
-      render(<BodyViewer measurementId="test-id-123" />);
-
-      expect(screen.getByTestId("body-viewer-loading")).toBeTruthy();
-
-      // Resolve so we don't leak async
-      await act(async () => {
-        resolveFetch(VALID_ARRAY_BUFFER);
-      });
+    it("shows loading text on initial render", () => {
+      // GLTFLoader default mock calls onLoad synchronously, but React state
+      // update ("success") is scheduled — initial render is always "loading"
+      renderViewer();
+      expect(screen.getByText(/loading body model/i)).toBeTruthy();
     });
 
-    it("calls fetchBodyMesh exactly once with measurementId on mount", async () => {
-      render(<BodyViewer measurementId="my-measurement-id" />);
-
-      await waitFor(() => {
-        expect(mockFetchBodyMesh).toHaveBeenCalledTimes(1);
-        expect(mockFetchBodyMesh).toHaveBeenCalledWith("my-measurement-id");
-      });
+    it("shows loading text while GLB is pending", () => {
+      // Override: load callback never fires
+      vi.mocked(GLTFLoader).mockImplementationOnce(
+        () => ({ load: vi.fn() }) as unknown as InstanceType<typeof GLTFLoader>,
+      );
+      renderViewer();
+      expect(screen.getByText(/loading body model/i)).toBeTruthy();
     });
   });
 
   describe("success state", () => {
-    it("calls onMeshLoaded after successful load", async () => {
-      const onMeshLoaded = vi.fn();
-      render(<BodyViewer measurementId="id-1" onMeshLoaded={onMeshLoaded} />);
-
+    it("hides loading text after successful GLB load", async () => {
+      renderViewer();
       await waitFor(() => {
-        expect(onMeshLoaded).toHaveBeenCalledTimes(1);
+        expect(screen.queryByText(/loading body model/i)).toBeNull();
       });
     });
 
-    it("removes loading indicator after successful load", async () => {
-      render(<BodyViewer measurementId="id-1" />);
-
+    it("shows gender toggle F and M buttons after load", async () => {
+      renderViewer();
       await waitFor(() => {
-        expect(screen.queryByTestId("body-viewer-loading")).toBeNull();
+        expect(screen.getByRole("button", { name: "F" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "M" })).toBeTruthy();
       });
     });
 
-    it("adds AmbientLight to scene on success", async () => {
-      render(<BodyViewer measurementId="id-1" />);
-
+    it("enables auto-rotation after load", async () => {
+      renderViewer();
       await waitFor(() => {
-        // Scene.add should have been called at least once
-        expect(mockSceneAdd).toHaveBeenCalled();
+        expect(mockControls.autoRotate).toBe(true);
       });
     });
 
-    it("enables auto-rotation on mount", async () => {
-      render(<BodyViewer measurementId="id-1" />);
-
-      await waitFor(() => {
-        expect(mockOrbitControls.autoRotate).toBe(true);
-      });
-    });
-
-    it("shows Reset view button after load", async () => {
-      render(<BodyViewer measurementId="id-1" />);
-
-      await waitFor(() => {
-        expect(screen.getByRole("button", { name: /reset view/i })).toBeTruthy();
-      });
+    it("renders canvas container with data-testid", async () => {
+      renderViewer();
+      expect(screen.getByTestId("body-viewer-canvas")).toBeTruthy();
     });
   });
 
   describe("error state", () => {
-    beforeEach(() => {
-      mockFetchBodyMesh.mockRejectedValue(new Error("API error 500"));
-    });
-
-    it("shows error message on fetch failure", async () => {
-      render(<BodyViewer measurementId="bad-id" />);
-
+    it("shows error message on GLB load failure", async () => {
+      vi.mocked(GLTFLoader).mockImplementationOnce(
+        () =>
+          ({
+            load: vi.fn(
+              (
+                _url: string,
+                _onLoad: unknown,
+                _onProgress: unknown,
+                onError: (e: ErrorEvent) => void,
+              ) => {
+                onError(new Error("GLB load failed") as unknown as ErrorEvent);
+              },
+            ),
+          }) as unknown as InstanceType<typeof GLTFLoader>,
+      );
+      renderViewer();
       await waitFor(() => {
-        expect(
-          screen.getByText(/couldn't build your 3d body/i),
-        ).toBeTruthy();
+        expect(screen.getByText(/couldn't load 3d body/i)).toBeTruthy();
       });
     });
+  });
 
-    it("shows Retry button on fetch failure", async () => {
-      render(<BodyViewer measurementId="bad-id" />);
-
-      await waitFor(() => {
-        expect(screen.getByRole("button", { name: /retry/i })).toBeTruthy();
-      });
-    });
-
-    it("retry button re-invokes fetchBodyMesh", async () => {
+  describe("gender toggle", () => {
+    it("calls onGenderChange('male') when M is clicked", async () => {
       const user = userEvent.setup();
-      render(<BodyViewer measurementId="bad-id" />);
+      const onGenderChange = vi.fn();
+      render(
+        <BodyViewer
+          measurements={DEFAULT_MEASUREMENTS}
+          gender="female"
+          onGenderChange={onGenderChange}
+        />,
+      );
+      const mBtn = await screen.findByRole("button", { name: "M" });
+      await user.click(mBtn);
+      expect(onGenderChange).toHaveBeenCalledWith("male");
+    });
 
-      const retryBtn = await screen.findByRole("button", { name: /retry/i });
-      await user.click(retryBtn);
-
-      expect(mockFetchBodyMesh).toHaveBeenCalledTimes(2);
+    it("calls onGenderChange('female') when F is clicked", async () => {
+      const user = userEvent.setup();
+      const onGenderChange = vi.fn();
+      render(
+        <BodyViewer
+          measurements={DEFAULT_MEASUREMENTS}
+          gender="male"
+          onGenderChange={onGenderChange}
+        />,
+      );
+      const fBtn = await screen.findByRole("button", { name: "F" });
+      await user.click(fBtn);
+      expect(onGenderChange).toHaveBeenCalledWith("female");
     });
   });
 
   describe("auto-rotation control", () => {
     it("disables auto-rotation on pointerdown", async () => {
-      render(<BodyViewer measurementId="id-1" />);
+      renderViewer();
+      await waitFor(() => expect(mockControls.autoRotate).toBe(true));
 
-      await waitFor(() => {
-        expect(mockOrbitControls.autoRotate).toBe(true);
-      });
-
-      // Simulate pointerdown on the canvas/container
-      const container = screen.getByTestId("body-viewer-canvas");
+      const canvas = screen.getByTestId("body-viewer-canvas");
       act(() => {
-        container.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+        canvas.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
       });
-
-      expect(mockOrbitControls.autoRotate).toBe(false);
+      expect(mockControls.autoRotate).toBe(false);
     });
+  });
 
-    it("Reset view button re-enables auto-rotation", async () => {
-      const user = userEvent.setup();
-      render(<BodyViewer measurementId="id-1" />);
+  describe("null measurements", () => {
+    it("renders without crash when measurements is null", async () => {
+      render(
+        <BodyViewer
+          measurements={null}
+          gender="female"
+          onGenderChange={vi.fn()}
+        />,
+      );
+      await waitFor(() => {
+        expect(screen.queryByText(/loading body model/i)).toBeNull();
+      });
+    });
+  });
 
-      // Wait for load and button
-      const resetBtn = await screen.findByRole("button", { name: /reset view/i });
-
-      // Manually disable auto-rotation first
-      mockOrbitControls.autoRotate = false;
-
-      await user.click(resetBtn);
-
-      expect(mockOrbitControls.autoRotate).toBe(true);
+  describe("className prop", () => {
+    it("applies className to the wrapper element", () => {
+      const { container } = render(
+        <BodyViewer
+          measurements={DEFAULT_MEASUREMENTS}
+          gender="female"
+          onGenderChange={vi.fn()}
+          className="my-custom-class"
+        />,
+      );
+      expect(container.firstElementChild?.className).toContain("my-custom-class");
     });
   });
 
   describe("unmount cleanup", () => {
     it("calls renderer.dispose() on unmount", async () => {
-      const { unmount } = render(<BodyViewer measurementId="id-1" />);
-
-      await waitFor(() => {
-        expect(screen.queryByTestId("body-viewer-loading")).toBeNull();
-      });
-
+      const { unmount } = renderViewer();
+      await waitFor(() =>
+        expect(screen.queryByText(/loading body model/i)).toBeNull(),
+      );
       unmount();
-
       expect(mockRendererDispose).toHaveBeenCalled();
     });
 
     it("calls controls.dispose() on unmount", async () => {
-      const { unmount } = render(<BodyViewer measurementId="id-1" />);
-
-      await waitFor(() => {
-        expect(screen.queryByTestId("body-viewer-loading")).toBeNull();
-      });
-
-      unmount();
-
-      expect(mockDispose).toHaveBeenCalled();
-    });
-  });
-
-  describe("optional className prop", () => {
-    it("applies className to wrapper element", async () => {
-      const { container } = render(
-        <BodyViewer measurementId="id-1" className="my-class" />,
+      const { unmount } = renderViewer();
+      await waitFor(() =>
+        expect(screen.queryByText(/loading body model/i)).toBeNull(),
       );
-
-      // The wrapper should have the className
-      expect(container.firstElementChild?.className).toContain("my-class");
+      unmount();
+      expect(mockDispose).toHaveBeenCalled();
     });
   });
 });

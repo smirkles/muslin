@@ -1,6 +1,9 @@
 import { create } from "zustand";
 import type { MeasurementsResponse } from "../lib/api";
+import type { Measurements } from "../lib/measurements";
 import type { ToolId } from "../lib/tools";
+
+export type BodyGender = "male" | "female";
 
 // ── Domain types (mirror backend response shapes) ─────────────────────────────
 
@@ -37,6 +40,8 @@ interface WizardState {
   patternId: string | null;
   gradedPatternId: string | null;
   measurementsResponse: MeasurementsResponse | null;
+  measurements: Measurements | null;
+  bodyGender: BodyGender;
   photoIds: string[];
   diagnosisResult: DiagnosisResult | null;
   cascadeScript: CascadeScript | null;
@@ -45,6 +50,8 @@ interface WizardState {
   setPatternId: (id: string) => void;
   setGradedPatternId: (id: string) => void;
   setMeasurementsResponse: (r: MeasurementsResponse) => void;
+  setMeasurements: (m: Measurements) => void;
+  setBodyGender: (g: BodyGender) => void;
   setPhotoIds: (ids: string[]) => void;
   setDiagnosisResult: (r: DiagnosisResult) => void;
   setCascadeScript: (s: CascadeScript) => void;
@@ -56,6 +63,8 @@ const initialState = {
   patternId: "bodice-classic",  // pre-load the single hackathon pattern
   gradedPatternId: null,
   measurementsResponse: null,
+  measurements: null,
+  bodyGender: "female" as BodyGender,
   photoIds: [],
   diagnosisResult: null,
   cascadeScript: null,
@@ -67,6 +76,8 @@ export const useWizardStore = create<WizardState>()((set) => ({
   setPatternId: (id) => set({ patternId: id }),
   setGradedPatternId: (id) => set({ gradedPatternId: id }),
   setMeasurementsResponse: (r) => set({ measurementsResponse: r }),
+  setMeasurements: (m) => set({ measurements: m }),
+  setBodyGender: (g) => set({ bodyGender: g }),
   setPhotoIds: (ids) => set({ photoIds: ids }),
   setDiagnosisResult: (r) => set({ diagnosisResult: r }),
   setCascadeScript: (s) => set({ cascadeScript: s }),
