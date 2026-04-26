@@ -26,11 +26,8 @@ export function MeasurementsPanel() {
       setMeasurementsResponse(result);
       setMeasurements(measurements); // raw values drive body morph targets
 
-      // Grade against the selected pattern if one is loaded; skip otherwise
-      if (patternId) {
-        const graded = await gradePattern(patternId, result.measurement_id);
-        setGradedPatternId(graded.graded_pattern_id);
-      }
+      const graded = await gradePattern(patternId!, result.measurement_id);
+      setGradedPatternId(graded.graded_pattern_id);
 
       // Advance to photo upload
       setActiveTool("photos");
