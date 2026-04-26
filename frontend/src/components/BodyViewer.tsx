@@ -90,6 +90,8 @@ export function BodyViewer({ measurements, gender, onGenderChange, className }: 
   const meshRef = useRef<Mesh | null>(null);
   const sceneRef = useRef<Scene | null>(null);
   const underwearGroupRef = useRef<Group | null>(null);
+  // Actual world-space bounds of the body mesh, set after GLB loads
+  const bodyBoundsRef = useRef<{ footY: number; bodyH: number } | null>(null);
 
   const handleResetView = useCallback(() => {
     const controls = controlsRef.current;
@@ -122,6 +124,7 @@ export function BodyViewer({ measurements, gender, onGenderChange, className }: 
       underwearGroupRef.current = null;
     }
     sceneRef.current = null;
+    bodyBoundsRef.current = null;
     controlsRef.current?.dispose();
     rendererRef.current?.dispose();
     controlsRef.current = null;
@@ -217,6 +220,24 @@ export function BodyViewer({ measurements, gender, onGenderChange, className }: 
         // Apply initial morph influences from current measurements
         applyInfluences(meshRef.current, computeInfluences(measurements, gender));
 
+        // Compute actual world-space bounds of the body mesh (not the full model
+        // group, which may include extra geometry that skews the bounding box)
+        modelGroup.updateMatrixWorld(true);
+        const meshBox = new Box3();
+        if (meshRef.current) {
+          meshBox.setFromObject(meshRef.current);
+        } else {
+          meshBox.setFromObject(modelGroup);
+        }
+        const footY = meshBox.min.y;
+        const bodyH = meshBox.max.y - meshBox.min.y;
+        bodyBoundsRef.current = { footY, bodyH };
+
+        if (process.env.NODE_ENV === "development") {
+          // eslint-disable-next-line no-console
+          console.log("[BodyViewer] body bounds", { footY, bodyH });
+        }
+
         // Remove any underwear the measurements effect might have race-added
         // before this async load completed (sceneRef was set before GLB loaded)
         if (underwearGroupRef.current) {
@@ -224,7 +245,7 @@ export function BodyViewer({ measurements, gender, onGenderChange, className }: 
           scene.remove(underwearGroupRef.current);
           underwearGroupRef.current = null;
         }
-        const uwGroup = buildUnderwearGroup(measurements, gender);
+        const uwGroup = buildUnderwearGroup(measurements, gender, footY, bodyH);
         underwearGroupRef.current = uwGroup;
         scene.add(uwGroup);
 
@@ -257,6 +278,7 @@ export function BodyViewer({ measurements, gender, onGenderChange, className }: 
         underwearGroupRef.current = null;
       }
       sceneRef.current = null;
+      bodyBoundsRef.current = null;
       controlsRef.current?.dispose();
       rendererRef.current?.dispose();
       controlsRef.current = null;
@@ -275,12 +297,16 @@ export function BodyViewer({ measurements, gender, onGenderChange, className }: 
       applyInfluences(meshRef.current, computeInfluences(measurements, gender));
     }
     const scene = sceneRef.current;
-    if (scene) {
+    const bounds = bodyBoundsRef.current;
+    // Only update underwear once the model has loaded and bounds are known
+    if (scene && bounds) {
       if (underwearGroupRef.current) {
         disposeGroup(underwearGroupRef.current);
         scene.remove(underwearGroupRef.current);
       }
-      const uwGroup = buildUnderwearGroup(measurements, gender);
+      const uwGroup = buildUnderwearGroup(
+        measurements, gender, bounds.footY, bounds.bodyH,
+      );
       underwearGroupRef.current = uwGroup;
       scene.add(uwGroup);
     }
@@ -386,14 +412,6 @@ function disposeGroup(group: Group) {
   });
 }
 
-// Body landmark Y positions for bodyapps-viz model normalised to 1.7 scene units (feet at 0)
-const BODY_Y = {
-  crotch: 0.75,
-  hipFull: 0.85,
-  underbust: 1.10,
-  bust: 1.17,
-} as const;
-
 function clamp(v: number, lo: number, hi: number) {
   return Math.min(Math.max(v, lo), hi);
 }
@@ -401,6 +419,8 @@ function clamp(v: number, lo: number, hi: number) {
 function buildUnderwearGroup(
   measurements: Measurements | null,
   gender: BodyGender,
+  footY: number,
+  bodyH: number,
 ): Group {
   const group = new Group();
 
@@ -410,12 +430,20 @@ function buildUnderwearGroup(
   const waist      = measurements?.waist_cm     ?? 74;
   const apexToApex = measurements?.apex_to_apex_cm ?? 18.5;
 
-  // circumference → scene-space radius, clamped to a plausible visual range
-  const spc    = 1.7 / height;
-  const hipR   = clamp((hip   / (2 * Math.PI)) * spc, 0.09, 0.22);
-  const waistR = clamp((waist / (2 * Math.PI)) * spc, 0.07, 0.18);
-  const bustR  = clamp((bust  / (2 * Math.PI)) * spc, 0.08, 0.20);
-  const halfApex = clamp((apexToApex / 2) * spc, 0.05, 0.11);
+  // scene units per cm — derived from actual body height, not assumed 1.7
+  const spc = bodyH / height;
+  // Scale the clamp bounds proportionally so they work at any body height
+  const s = bodyH / 1.7;
+  const hipR    = clamp((hip        / (2 * Math.PI)) * spc, 0.06 * s, 0.22 * s);
+  const waistR  = clamp((waist      / (2 * Math.PI)) * spc, 0.05 * s, 0.18 * s);
+  const bustR   = clamp((bust       / (2 * Math.PI)) * spc, 0.05 * s, 0.20 * s);
+  const halfApex = clamp((apexToApex / 2)             * spc, 0.03 * s, 0.11 * s);
+
+  // Y positions as fractions of actual body height, offset from actual foot position
+  const crotchY    = footY + 0.44 * bodyH;
+  const hipFullY   = footY + 0.51 * bodyH;
+  const underbustY = footY + 0.69 * bodyH;
+  const bustY      = footY + 0.72 * bodyH;
 
   const mat = new MeshStandardMaterial({
     color: gender === "female" ? 0xc8a8c0 : 0x8fb3cc,
@@ -423,30 +451,31 @@ function buildUnderwearGroup(
     metalness: 0,
   });
 
-  // Briefs: from crotch up to just above hip fullness
-  const pantsH = BODY_Y.hipFull - BODY_Y.crotch + 0.06;
+  // Briefs: from crotch up to hip fullness
+  const pantsH = (hipFullY - crotchY) + 0.04 * s;
   const pants = new Mesh(
     new CylinderGeometry(waistR * 1.01, hipR * 1.01, pantsH, 32),
     mat,
   );
-  pants.position.y = BODY_Y.crotch + pantsH / 2;
+  pants.position.y = crotchY + pantsH / 2;
   group.add(pants);
 
   if (gender === "female") {
     // Bra band at underbust
     const band = new Mesh(
-      new CylinderGeometry(bustR * 0.93, bustR * 0.93, 0.035, 32),
+      new CylinderGeometry(bustR * 0.93, bustR * 0.93, 0.03 * s, 32),
       mat,
     );
-    band.position.y = BODY_Y.underbust;
+    band.position.y = underbustY;
     group.add(band);
 
-    // Cups: fixed small Z offset so perspective can't push them out of frame
-    const cupR = Math.min(bustR * 0.44, 0.065);
+    // Cups: Z offset proportional to bustR but capped so perspective stays sane
+    const cupR = Math.min(bustR * 0.44, 0.06 * s);
+    const cupZ = Math.min(bustR * 0.85, 0.10 * s);
     for (const side of [-1, 1] as const) {
       const cup = new Mesh(new SphereGeometry(cupR, 16, 12), mat);
       cup.scale.z = 0.55;
-      cup.position.set(side * halfApex, BODY_Y.bust, 0.11);
+      cup.position.set(side * halfApex, bustY, cupZ);
       group.add(cup);
     }
   }
