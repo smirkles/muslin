@@ -505,3 +505,226 @@ describe("downloadPattern", () => {
     );
   });
 });
+
+// ── fetchPattern tests ────────────────────────────────────────────────────────
+
+const PATTERN_DETAIL_RESPONSE = {
+  id: "bodice-classic",
+  name: "Bodice Classic",
+  description: "A classic fitted bodice block",
+  piece_count: 3,
+  svg: "<svg><rect width='100' height='200'/></svg>",
+};
+
+describe("fetchPattern", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it("returns a pattern detail with svg on 200", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: () => Promise.resolve(PATTERN_DETAIL_RESPONSE),
+      }),
+    );
+
+    const { fetchPattern } = await import("./api");
+    const result = await fetchPattern("bodice-classic");
+
+    expect(result).toEqual(PATTERN_DETAIL_RESPONSE);
+    expect(result.svg).toBe("<svg><rect width='100' height='200'/></svg>");
+  });
+
+  it("calls GET /patterns/{patternId} with correct URL", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve(PATTERN_DETAIL_RESPONSE),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const { fetchPattern } = await import("./api");
+    await fetchPattern("bodice-classic");
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      "http://localhost:8000/patterns/bodice-classic",
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
+  it("throws on non-ok response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        status: 404,
+        ok: false,
+        json: () => Promise.resolve({ detail: "Pattern not found" }),
+      }),
+    );
+
+    const { fetchPattern } = await import("./api");
+    await expect(fetchPattern("nonexistent-pattern")).rejects.toThrow("API error 404");
+  });
+
+  it("uses NEXT_PUBLIC_API_URL env var", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://custom.test:9000");
+    const mockFetch = vi.fn().mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve(PATTERN_DETAIL_RESPONSE),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const { fetchPattern } = await import("./api");
+    await fetchPattern("bodice-classic");
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      "http://custom.test:9000/patterns/bodice-classic",
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+
+  it("falls back to http://localhost:8000 when NEXT_PUBLIC_API_URL is not set", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "");
+    const mockFetch = vi.fn().mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve(PATTERN_DETAIL_RESPONSE),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const { fetchPattern } = await import("./api");
+    await fetchPattern("bodice-classic");
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      "http://localhost:8000/patterns/bodice-classic",
+      expect.objectContaining({ method: "GET" }),
+    );
+  });
+});
+
+// ── applyAdjustment tests ─────────────────────────────────────────────────────
+
+const CASCADE_SCRIPT_RESPONSE = {
+  adjustment_type: "fba",
+  pattern_id: "bodice-classic",
+  amount_cm: 2.0,
+  steps: [
+    { step_number: 1, narration: "Mark the bust apex point.", svg: "<svg><circle cx='50' cy='50' r='5'/></svg>" },
+    { step_number: 2, narration: "Draw the FBA cut lines.", svg: "<svg><line x1='0' y1='0' x2='100' y2='100'/></svg>" },
+    { step_number: 3, narration: "Spread the pattern by 2.0 cm.", svg: "<svg><rect width='120' height='200'/></svg>" },
+  ],
+  seam_adjustments: { side_seam: 2.0, waist_dart: -0.5 },
+};
+
+describe("applyAdjustment", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
+  });
+
+  it("returns a CascadeScriptApiResponse on 200", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        status: 200,
+        ok: true,
+        json: () => Promise.resolve(CASCADE_SCRIPT_RESPONSE),
+      }),
+    );
+
+    const { applyAdjustment } = await import("./api");
+    const result = await applyAdjustment("bodice-classic", "fba", 2.0);
+
+    expect(result).toEqual(CASCADE_SCRIPT_RESPONSE);
+    expect(result.steps).toHaveLength(3);
+    expect(result.steps[0].narration).toBe("Mark the bust apex point.");
+  });
+
+  it("calls POST /cascades/apply-adjustment with correct URL and body", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve(CASCADE_SCRIPT_RESPONSE),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const { applyAdjustment } = await import("./api");
+    await applyAdjustment("bodice-classic", "fba", 2.0);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      "http://localhost:8000/cascades/apply-adjustment",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pattern_id: "bodice-classic",
+          adjustment_type: "fba",
+          amount_cm: 2.0,
+        }),
+      }),
+    );
+  });
+
+  it("throws on non-ok response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        status: 500,
+        ok: false,
+        json: () => Promise.resolve({ detail: "Server error" }),
+      }),
+    );
+
+    const { applyAdjustment } = await import("./api");
+    await expect(applyAdjustment("bodice-classic", "fba", 2.0)).rejects.toThrow("API error 500");
+  });
+
+  it("uses NEXT_PUBLIC_API_URL env var", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "http://custom.test:9000");
+    const mockFetch = vi.fn().mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve(CASCADE_SCRIPT_RESPONSE),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const { applyAdjustment } = await import("./api");
+    await applyAdjustment("bodice-classic", "fba", 2.0);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      "http://custom.test:9000/cascades/apply-adjustment",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("falls back to http://localhost:8000 when NEXT_PUBLIC_API_URL is not set", async () => {
+    vi.stubEnv("NEXT_PUBLIC_API_URL", "");
+    const mockFetch = vi.fn().mockResolvedValue({
+      status: 200,
+      ok: true,
+      json: () => Promise.resolve(CASCADE_SCRIPT_RESPONSE),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const { applyAdjustment } = await import("./api");
+    await applyAdjustment("bodice-classic", "fba", 2.0);
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      "http://localhost:8000/cascades/apply-adjustment",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+});
