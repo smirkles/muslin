@@ -396,3 +396,104 @@ class TestRunDiagnosisCoordinatorError:
         with pytest.raises(CoordinatorParseError):
             with patch("lib.diagnosis.multi_agent._PROMPTS_ROOT", tmp_path):
                 await run_diagnosis(images, lambda: mock_agent)
+
+
+# ---------------------------------------------------------------------------
+# spec 24 — neck_collar specialist
+# ---------------------------------------------------------------------------
+
+
+class TestNeckCollarSpecialist:
+    def test_neck_collar_in_specialist_regions(self) -> None:
+        """_SPECIALIST_REGIONS contains 'neck_collar'."""
+        from lib.diagnosis.multi_agent import _SPECIALIST_REGIONS
+
+        assert "neck_collar" in _SPECIALIST_REGIONS
+
+    async def test_four_specialists_all_succeed_returns_diagnosis_result(
+        self, tmp_path: Path
+    ) -> None:
+        """run_diagnosis with all four specialists (bust, waist_hip, back, neck_collar) returns a DiagnosisResult."""
+        from lib.diagnosis.multi_agent import DiagnosisResult, run_diagnosis
+
+        bust_json = _make_specialist_json("bust", "pulling_across_bust")
+        waist_json = _make_specialist_json("waist_hip", "excess_fabric")
+        back_json = _make_specialist_json("back", "swayback")
+        neck_json = _make_specialist_json("neck_collar", "cb_neckline_gaping")
+        coordinator_json = _make_coordinator_json("none")
+
+        mock_agent = _make_mock_agent(
+            [bust_json, waist_json, back_json, neck_json, coordinator_json]
+        )
+
+        for subdir in [
+            "diagnosis/bust",
+            "diagnosis/waist_hip",
+            "diagnosis/back",
+            "diagnosis/neck_collar",
+            "diagnosis/coordinator",
+        ]:
+            (tmp_path / subdir).mkdir(parents=True, exist_ok=True)
+        (tmp_path / "diagnosis/bust/v1_baseline.md").write_text("Bust.")
+        (tmp_path / "diagnosis/waist_hip/v1_baseline.md").write_text("Waist/hip.")
+        (tmp_path / "diagnosis/back/v1_baseline.md").write_text("Back.")
+        (tmp_path / "diagnosis/neck_collar/v1_baseline.md").write_text("Neck/collar.")
+        (tmp_path / "diagnosis/coordinator/v1_baseline.md").write_text(
+            "Synthesise: {{specialist_outputs}}"
+        )
+
+        images = [b"img"]
+
+        with patch("lib.diagnosis.multi_agent._PROMPTS_ROOT", tmp_path):
+            result = await run_diagnosis(images, _make_agent_factory(mock_agent))
+
+        assert isinstance(result, DiagnosisResult)
+
+    async def test_neck_collar_specialist_fails_others_succeed_returns_result(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """When neck_collar specialist fails, run_diagnosis still returns a result (graceful degradation)."""
+        from lib.diagnosis.multi_agent import DiagnosisResult, run_diagnosis
+
+        def partial_run(prompt_name: str, variables: dict, images=None, max_tokens: int = 256):
+            if "neck_collar" in prompt_name:
+                raise RuntimeError("neck_collar specialist failed")
+            if "bust" in prompt_name:
+                return _make_agent_response(_make_specialist_json("bust"))
+            if "waist_hip" in prompt_name:
+                return _make_agent_response(_make_specialist_json("waist_hip"))
+            if "back" in prompt_name:
+                return _make_agent_response(_make_specialist_json("back"))
+            # coordinator
+            return _make_agent_response(_make_coordinator_json("none"))
+
+        mock_agent = MagicMock()
+        mock_agent.run.side_effect = partial_run
+
+        for subdir in [
+            "diagnosis/bust",
+            "diagnosis/waist_hip",
+            "diagnosis/back",
+            "diagnosis/neck_collar",
+            "diagnosis/coordinator",
+        ]:
+            (tmp_path / subdir).mkdir(parents=True, exist_ok=True)
+        (tmp_path / "diagnosis/bust/v1_baseline.md").write_text("Bust.")
+        (tmp_path / "diagnosis/waist_hip/v1_baseline.md").write_text("Waist/hip.")
+        (tmp_path / "diagnosis/back/v1_baseline.md").write_text("Back.")
+        (tmp_path / "diagnosis/neck_collar/v1_baseline.md").write_text("Neck/collar.")
+        (tmp_path / "diagnosis/coordinator/v1_baseline.md").write_text(
+            "Synthesise: {{specialist_outputs}}"
+        )
+
+        images = [b"img"]
+
+        with caplog.at_level(logging.WARNING, logger="lib.diagnosis.multi_agent"):
+            with patch("lib.diagnosis.multi_agent._PROMPTS_ROOT", tmp_path):
+                result = await run_diagnosis(images, lambda: mock_agent)
+
+        # Degraded gracefully — result still produced
+        assert isinstance(result, DiagnosisResult)
+        # Warning logged naming the failed neck_collar specialist
+        warning_messages = [r.message for r in caplog.records if r.levelno >= logging.WARNING]
+        assert any("neck_collar" in msg for msg in warning_messages)
