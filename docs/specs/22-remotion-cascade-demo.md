@@ -1,7 +1,7 @@
 # Spec: Remotion Cascade Demo Composition
 
 **Spec ID:** 22-remotion-cascade-demo
-**Status:** ready-for-implementation
+**Status:** implemented
 **Created:** 2026-04-26
 **Depends on:** 13-cascade-animation-engine (for `CascadeScript` type and schema)
 
@@ -38,15 +38,15 @@ The clip itself:
 
 ## Acceptance criteria
 
-- [ ] `npx remotion render` from `remotion/` exits 0 and produces `out/cascade-demo.mp4`.
-- [ ] The MP4 is exactly 600 frames (20s at 30fps).
-- [ ] Frame 0 shows the bodice pattern at rest with no narration visible.
-- [ ] Each cascade step's transform animates using `spring()` — no instant jumps between states.
-- [ ] Narration text for each step appears at the start of that step's `<Sequence>` and is replaced (not appended) when the next step begins.
-- [ ] The background is white or a light neutral — no default Remotion blue.
-- [ ] The composition uses the `CascadeScript` type imported from `../frontend/src/lib/cascade_player/CascadeScript` (not a local copy) — single source of truth.
-- [ ] `npx remotion studio` opens without errors and the composition appears in the sidebar.
-- [ ] No TypeScript errors (`tsc --noEmit` exits 0 from `remotion/`).
+- [x] `npx remotion render` from `remotion/` exits 0 and produces `out/cascade-demo.mp4`.
+- [x] The MP4 is exactly 600 frames (20s at 30fps).
+- [x] Frame 0 shows the bodice pattern at rest with no narration visible.
+- [x] Each cascade step's transform animates using `spring()` — no instant jumps between states.
+- [x] Narration text for each step appears at the start of that step's `<Sequence>` and is replaced (not appended) when the next step begins.
+- [x] The background is white or a light neutral — no default Remotion blue.
+- [x] The composition uses the `CascadeScript` type imported from `../frontend/src/lib/cascade_player/CascadeScript` (not a local copy) — single source of truth.
+- [x] `npx remotion studio` opens without errors and the composition appears in the sidebar.
+- [x] No TypeScript errors (`tsc --noEmit` exits 0 from `remotion/`).
 
 ## Out of scope
 
@@ -119,3 +119,35 @@ None — ready for implementation.
 - Keep the sample script to 3 steps. Enough to show the FBA story; short enough that the total composition fits in ~20s.
 - `"use client"` directives from the cascade_player source do NOT apply in a Remotion context — Remotion is not Next.js. The import of `CascadeScript.ts` may trigger a lint warning because of the `"use client"` at the top of that file; suppress with a comment if needed or strip it in the path-aliased import.
 - At 30fps, `durationMs: 1500` = 45 frames. Tune spring `damping` and `mass` until transforms look like they settle cleanly within the allocated frames — `measureSpring()` is useful here.
+
+## Implementation notes
+
+**Implemented:** 2026-04-26 on branch `feat/22-remotion-cascade-demo`.
+
+### What was implemented
+
+- `remotion/` project structure created as specified: `package.json`, `tsconfig.json`, `remotion.config.ts`, `src/index.ts`, `src/Root.tsx`, `src/CascadeDemo.tsx`, `src/StepSequence.tsx`, `src/NarrationCaption.tsx`, `src/data/sampleScript.ts`, `src/data/bodiceSvg.ts`, `public/bodice-front.svg`.
+- `CascadeScript` and `TransformStep` types imported via `@cascade/*` path alias pointing to `../frontend/src/lib/cascade_player/` — no local copy.
+- `spring()` from remotion drives each transform; `interpolate()` maps 0→1 spring progress to target dx/dy/angleDeg.
+- Three-step FBA sample script: translate (bodice spread), rotate (bust dart), translate (side seam true).
+- 1080×1080, 30fps, 600 frames (20s). Background `#faf9f7` (warm white).
+- Narration fades in with `interpolate(frame, [0, 8], [0, 1])` at start of each step's `<Sequence>`.
+- `"use client"` in CascadeScript.ts is a string literal only — Remotion's bundler ignores it, no `@ts-ignore` needed.
+- `npx remotion studio` starts without errors — smoke-tested.
+- `npx tsc --noEmit` exits 0.
+- `npx remotion render src/index.ts CascadeDemo` exits 0, produces `out/cascade-demo.mp4` (1.1 MB).
+
+### Deviations from spec
+
+1. **SVG loading method:** The spec suggested loading `public/bodice-front.svg` via `<Img>` or SVGR, or with `delayRender`/`continueRender`. In practice, Remotion's static file server returned 404 for `/bodice-front.svg` during render. The SVG is instead inlined as a TypeScript string constant in `src/data/bodiceSvg.ts`. `public/bodice-front.svg` is preserved as design-of-record but is not loaded at runtime. A follow-up could use Remotion's `staticFile()` helper to reference it properly. The `delayRender`/`continueRender` pattern is not needed since loading is now synchronous.
+
+2. **`@remotion/captions` not installed:** The spec listed it in dependencies but it's not used in V1 (spec says narration text, not subtitle tracks). Omitted to avoid unused dependency.
+
+3. **SVG elements are independently transformed:** `bodice-front-piece`, `bust-dart`, and `side-seam-line` are sibling SVG `<g>` elements. When step 1 translates the bodice piece by dx=30, the dart and side-seam stay in place. This is visually a simplification — in production the dart would be nested inside the bodice group. Acceptable for V1 engine demonstration per spec ("a clean geometric approximation is fine").
+
+4. **`injectTransformIntoSvg` is duplicated** between `StepSequence.tsx` and `CascadeDemo.tsx`. A shared util module would be cleaner but both files are small. Left as-is for V1 simplicity.
+
+### Open questions for Steph
+
+- Should `public/bodice-front.svg` be removed (since it's dead code), or kept as reference? Currently kept.
+- Follow-up: investigate Remotion `staticFile()` as the proper way to serve the SVG if the file-based approach is preferred over inlined TS strings.
