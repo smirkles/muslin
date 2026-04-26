@@ -85,27 +85,34 @@ def _make_agent_factory(agent: MagicMock) -> Callable[[], MagicMock]:  # type: i
 
 class TestRunDiagnosisHappyPath:
     async def test_three_specialists_returns_diagnosis_result(self, tmp_path: Path) -> None:
-        """run_diagnosis with three successful specialists returns a DiagnosisResult."""
+        """run_diagnosis with four successful specialists returns a DiagnosisResult."""
         from lib.diagnosis.multi_agent import DiagnosisResult, run_diagnosis
 
         bust_json = _make_specialist_json("bust", "pulling_across_bust")
         waist_json = _make_specialist_json("waist_hip", "excess_fabric")
         back_json = _make_specialist_json("back", "swayback")
+        shoulder_json = _make_specialist_json("shoulder_sleeve", "forward_shoulder")
         coordinator_json = _make_coordinator_json("fba")
 
-        mock_agent = _make_mock_agent([bust_json, waist_json, back_json, coordinator_json])
+        mock_agent = _make_mock_agent(
+            [bust_json, waist_json, back_json, shoulder_json, coordinator_json]
+        )
 
         # Set up prompt files in tmp_path
         for subdir in [
             "diagnosis/bust",
             "diagnosis/waist_hip",
             "diagnosis/back",
+            "diagnosis/shoulder_sleeve",
             "diagnosis/coordinator",
         ]:
             (tmp_path / subdir).mkdir(parents=True, exist_ok=True)
         (tmp_path / "diagnosis/bust/v1_baseline.md").write_text("Analyze bust fit.")
         (tmp_path / "diagnosis/waist_hip/v1_baseline.md").write_text("Analyze waist/hip fit.")
         (tmp_path / "diagnosis/back/v1_baseline.md").write_text("Analyze back fit.")
+        (tmp_path / "diagnosis/shoulder_sleeve/v1_baseline.md").write_text(
+            "Analyze shoulder/sleeve fit."
+        )
         (tmp_path / "diagnosis/coordinator/v1_baseline.md").write_text(
             "Synthesise: {{specialist_outputs}}"
         )
@@ -121,26 +128,33 @@ class TestRunDiagnosisHappyPath:
     async def test_three_specialists_coordinator_called_with_all_outputs(
         self, tmp_path: Path
     ) -> None:
-        """Coordinator prompt is rendered with all three specialist outputs."""
+        """Coordinator prompt is rendered with all four specialist outputs."""
         from lib.diagnosis.multi_agent import run_diagnosis
 
         bust_json = _make_specialist_json("bust", "pulling")
         waist_json = _make_specialist_json("waist_hip", "excess")
         back_json = _make_specialist_json("back", "pooling")
+        shoulder_json = _make_specialist_json("shoulder_sleeve", "forward_shoulder")
         coordinator_json = _make_coordinator_json("fba")
 
-        mock_agent = _make_mock_agent([bust_json, waist_json, back_json, coordinator_json])
+        mock_agent = _make_mock_agent(
+            [bust_json, waist_json, back_json, shoulder_json, coordinator_json]
+        )
 
         for subdir in [
             "diagnosis/bust",
             "diagnosis/waist_hip",
             "diagnosis/back",
+            "diagnosis/shoulder_sleeve",
             "diagnosis/coordinator",
         ]:
             (tmp_path / subdir).mkdir(parents=True, exist_ok=True)
         (tmp_path / "diagnosis/bust/v1_baseline.md").write_text("Bust prompt.")
         (tmp_path / "diagnosis/waist_hip/v1_baseline.md").write_text("Waist/hip prompt.")
         (tmp_path / "diagnosis/back/v1_baseline.md").write_text("Back prompt.")
+        (tmp_path / "diagnosis/shoulder_sleeve/v1_baseline.md").write_text(
+            "Shoulder/sleeve prompt."
+        )
         (tmp_path / "diagnosis/coordinator/v1_baseline.md").write_text(
             "Synthesise: {{specialist_outputs}}"
         )
@@ -150,18 +164,19 @@ class TestRunDiagnosisHappyPath:
         with patch("lib.diagnosis.multi_agent._PROMPTS_ROOT", tmp_path):
             await run_diagnosis(images, _make_agent_factory(mock_agent))
 
-        # The 4th call (index 3) is the coordinator
-        coordinator_call = mock_agent.run.call_args_list[3]
+        # The 5th call (index 4) is the coordinator (4 specialists + coordinator)
+        coordinator_call = mock_agent.run.call_args_list[4]
         variables = (
             coordinator_call[0][1]
             if coordinator_call[0]
             else coordinator_call[1].get("variables", {})
         )
         specialist_outputs = variables.get("specialist_outputs", "")
-        # All three regions should appear in the serialised JSON
+        # All four regions should appear in the serialised JSON
         assert "bust" in specialist_outputs
         assert "waist_hip" in specialist_outputs
         assert "back" in specialist_outputs
+        assert "shoulder_sleeve" in specialist_outputs
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +194,7 @@ class TestRunDiagnosisConcurrency:
                 "diagnosis/bust": "bust",
                 "diagnosis/waist_hip": "waist_hip",
                 "diagnosis/back": "back",
+                "diagnosis/shoulder_sleeve": "shoulder_sleeve",
                 "diagnosis/coordinator": "coordinator",
             }
             region = region_map.get(prompt_name, "bust")
@@ -197,12 +213,14 @@ class TestRunDiagnosisConcurrency:
             "diagnosis/bust",
             "diagnosis/waist_hip",
             "diagnosis/back",
+            "diagnosis/shoulder_sleeve",
             "diagnosis/coordinator",
         ]:
             (tmp_path / subdir).mkdir(parents=True, exist_ok=True)
         (tmp_path / "diagnosis/bust/v1_baseline.md").write_text("Bust.")
         (tmp_path / "diagnosis/waist_hip/v1_baseline.md").write_text("Waist/hip.")
         (tmp_path / "diagnosis/back/v1_baseline.md").write_text("Back.")
+        (tmp_path / "diagnosis/shoulder_sleeve/v1_baseline.md").write_text("Shoulder/sleeve.")
         (tmp_path / "diagnosis/coordinator/v1_baseline.md").write_text(
             "Synthesise: {{specialist_outputs}}"
         )
@@ -226,7 +244,7 @@ class TestRunDiagnosisPartialFailure:
     async def test_one_specialist_fails_coordinator_runs_with_survivors(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
     ) -> None:
-        """When one specialist fails, coordinator runs with the remaining two survivors."""
+        """When one specialist fails, coordinator runs with the remaining three survivors."""
         from lib.diagnosis.multi_agent import DiagnosisResult, run_diagnosis
 
         call_count = [0]
@@ -239,6 +257,8 @@ class TestRunDiagnosisPartialFailure:
                 return _make_agent_response(_make_specialist_json("waist_hip"))
             if "back" in prompt_name:
                 return _make_agent_response(_make_specialist_json("back"))
+            if "shoulder_sleeve" in prompt_name:
+                return _make_agent_response(_make_specialist_json("shoulder_sleeve"))
             # coordinator
             return _make_agent_response(_make_coordinator_json("swayback"))
 
@@ -249,12 +269,14 @@ class TestRunDiagnosisPartialFailure:
             "diagnosis/bust",
             "diagnosis/waist_hip",
             "diagnosis/back",
+            "diagnosis/shoulder_sleeve",
             "diagnosis/coordinator",
         ]:
             (tmp_path / subdir).mkdir(parents=True, exist_ok=True)
         (tmp_path / "diagnosis/bust/v1_baseline.md").write_text("Bust.")
         (tmp_path / "diagnosis/waist_hip/v1_baseline.md").write_text("Waist/hip.")
         (tmp_path / "diagnosis/back/v1_baseline.md").write_text("Back.")
+        (tmp_path / "diagnosis/shoulder_sleeve/v1_baseline.md").write_text("Shoulder/sleeve.")
         (tmp_path / "diagnosis/coordinator/v1_baseline.md").write_text(
             "Synthesise: {{specialist_outputs}}"
         )
@@ -271,7 +293,7 @@ class TestRunDiagnosisPartialFailure:
         assert any("bust" in record.message for record in caplog.records)
 
         # Coordinator received only survivors — bust must be absent from its input
-        coordinator_call = mock_agent.run.call_args_list[3]
+        coordinator_call = mock_agent.run.call_args_list[4]
         coordinator_variables = (
             coordinator_call[0][1]
             if coordinator_call[0]
@@ -281,6 +303,7 @@ class TestRunDiagnosisPartialFailure:
         assert "bust" not in coordinator_specialist_outputs  # failed specialist excluded
         assert "waist_hip" in coordinator_specialist_outputs  # survivor present
         assert "back" in coordinator_specialist_outputs  # survivor present
+        assert "shoulder_sleeve" in coordinator_specialist_outputs  # survivor present
 
     async def test_one_specialist_fails_warning_names_region(
         self, tmp_path: Path, caplog: pytest.LogCaptureFixture
@@ -295,6 +318,8 @@ class TestRunDiagnosisPartialFailure:
                 return _make_agent_response(_make_specialist_json("bust"))
             if "back" in prompt_name:
                 return _make_agent_response(_make_specialist_json("back"))
+            if "shoulder_sleeve" in prompt_name:
+                return _make_agent_response(_make_specialist_json("shoulder_sleeve"))
             return _make_agent_response(_make_coordinator_json("fba"))
 
         mock_agent = MagicMock()
@@ -304,12 +329,14 @@ class TestRunDiagnosisPartialFailure:
             "diagnosis/bust",
             "diagnosis/waist_hip",
             "diagnosis/back",
+            "diagnosis/shoulder_sleeve",
             "diagnosis/coordinator",
         ]:
             (tmp_path / subdir).mkdir(parents=True, exist_ok=True)
         (tmp_path / "diagnosis/bust/v1_baseline.md").write_text("Bust.")
         (tmp_path / "diagnosis/waist_hip/v1_baseline.md").write_text("Waist/hip.")
         (tmp_path / "diagnosis/back/v1_baseline.md").write_text("Back.")
+        (tmp_path / "diagnosis/shoulder_sleeve/v1_baseline.md").write_text("Shoulder/sleeve.")
         (tmp_path / "diagnosis/coordinator/v1_baseline.md").write_text(
             "Synthesise: {{specialist_outputs}}"
         )
@@ -333,7 +360,7 @@ class TestRunDiagnosisTotalFailure:
     async def test_all_three_specialists_fail_raises_all_specialists_failed(
         self, tmp_path: Path
     ) -> None:
-        """AllSpecialistsFailedError raised when all three specialists fail."""
+        """AllSpecialistsFailedError raised when all four specialists fail."""
         from lib.diagnosis.multi_agent import AllSpecialistsFailedError, run_diagnosis
 
         mock_agent = MagicMock()
@@ -343,12 +370,14 @@ class TestRunDiagnosisTotalFailure:
             "diagnosis/bust",
             "diagnosis/waist_hip",
             "diagnosis/back",
+            "diagnosis/shoulder_sleeve",
             "diagnosis/coordinator",
         ]:
             (tmp_path / subdir).mkdir(parents=True, exist_ok=True)
         (tmp_path / "diagnosis/bust/v1_baseline.md").write_text("Bust.")
         (tmp_path / "diagnosis/waist_hip/v1_baseline.md").write_text("Waist/hip.")
         (tmp_path / "diagnosis/back/v1_baseline.md").write_text("Back.")
+        (tmp_path / "diagnosis/shoulder_sleeve/v1_baseline.md").write_text("Shoulder/sleeve.")
         (tmp_path / "diagnosis/coordinator/v1_baseline.md").write_text(
             "Synthesise: {{specialist_outputs}}"
         )
@@ -373,20 +402,25 @@ class TestRunDiagnosisCoordinatorError:
         bust_json = _make_specialist_json("bust")
         waist_json = _make_specialist_json("waist_hip")
         back_json = _make_specialist_json("back")
+        shoulder_json = _make_specialist_json("shoulder_sleeve")
         bad_coordinator = '{"issues": [], "primary_recommendation": "ok", "cascade_type": "banana"}'
 
-        mock_agent = _make_mock_agent([bust_json, waist_json, back_json, bad_coordinator])
+        mock_agent = _make_mock_agent(
+            [bust_json, waist_json, back_json, shoulder_json, bad_coordinator]
+        )
 
         for subdir in [
             "diagnosis/bust",
             "diagnosis/waist_hip",
             "diagnosis/back",
+            "diagnosis/shoulder_sleeve",
             "diagnosis/coordinator",
         ]:
             (tmp_path / subdir).mkdir(parents=True, exist_ok=True)
         (tmp_path / "diagnosis/bust/v1_baseline.md").write_text("Bust.")
         (tmp_path / "diagnosis/waist_hip/v1_baseline.md").write_text("Waist/hip.")
         (tmp_path / "diagnosis/back/v1_baseline.md").write_text("Back.")
+        (tmp_path / "diagnosis/shoulder_sleeve/v1_baseline.md").write_text("Shoulder/sleeve.")
         (tmp_path / "diagnosis/coordinator/v1_baseline.md").write_text(
             "Synthesise: {{specialist_outputs}}"
         )
@@ -396,3 +430,149 @@ class TestRunDiagnosisCoordinatorError:
         with pytest.raises(CoordinatorParseError):
             with patch("lib.diagnosis.multi_agent._PROMPTS_ROOT", tmp_path):
                 await run_diagnosis(images, lambda: mock_agent)
+
+
+# ---------------------------------------------------------------------------
+# spec 22 — shoulder_sleeve specialist
+# ---------------------------------------------------------------------------
+
+
+class TestShoulderSleeveSpecialist:
+    def test_shoulder_sleeve_in_specialist_regions(self) -> None:
+        """_SPECIALIST_REGIONS contains 'shoulder_sleeve'."""
+        from lib.diagnosis.multi_agent import _SPECIALIST_REGIONS
+
+        assert "shoulder_sleeve" in _SPECIALIST_REGIONS
+
+    async def test_four_specialists_all_succeed_returns_diagnosis_result(
+        self, tmp_path: Path
+    ) -> None:
+        """run_diagnosis with all four specialists succeeding returns a DiagnosisResult."""
+        from lib.diagnosis.multi_agent import DiagnosisResult, run_diagnosis
+
+        bust_json = _make_specialist_json("bust", "pulling_across_bust")
+        waist_json = _make_specialist_json("waist_hip", "excess_fabric")
+        back_json = _make_specialist_json("back", "swayback")
+        shoulder_json = _make_specialist_json("shoulder_sleeve", "forward_shoulder")
+        coordinator_json = _make_coordinator_json("fba")
+
+        mock_agent = _make_mock_agent(
+            [bust_json, waist_json, back_json, shoulder_json, coordinator_json]
+        )
+
+        for subdir in [
+            "diagnosis/bust",
+            "diagnosis/waist_hip",
+            "diagnosis/back",
+            "diagnosis/shoulder_sleeve",
+            "diagnosis/coordinator",
+        ]:
+            (tmp_path / subdir).mkdir(parents=True, exist_ok=True)
+        (tmp_path / "diagnosis/bust/v1_baseline.md").write_text("Bust.")
+        (tmp_path / "diagnosis/waist_hip/v1_baseline.md").write_text("Waist/hip.")
+        (tmp_path / "diagnosis/back/v1_baseline.md").write_text("Back.")
+        (tmp_path / "diagnosis/shoulder_sleeve/v1_baseline.md").write_text("Shoulder/sleeve.")
+        (tmp_path / "diagnosis/coordinator/v1_baseline.md").write_text(
+            "Synthesise: {{specialist_outputs}}"
+        )
+
+        images = [b"img"]
+
+        with patch("lib.diagnosis.multi_agent._PROMPTS_ROOT", tmp_path):
+            result = await run_diagnosis(images, _make_agent_factory(mock_agent))
+
+        assert isinstance(result, DiagnosisResult)
+
+    async def test_shoulder_sleeve_specialist_fails_others_succeed_returns_result(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """When shoulder_sleeve specialist fails, run_diagnosis still returns a result."""
+        from lib.diagnosis.multi_agent import DiagnosisResult, run_diagnosis
+
+        def partial_run(prompt_name: str, variables: dict, images=None, max_tokens: int = 256):
+            if "shoulder_sleeve" in prompt_name:
+                raise RuntimeError("shoulder_sleeve specialist failed")
+            if "bust" in prompt_name:
+                return _make_agent_response(_make_specialist_json("bust"))
+            if "waist_hip" in prompt_name:
+                return _make_agent_response(_make_specialist_json("waist_hip"))
+            if "back" in prompt_name:
+                return _make_agent_response(_make_specialist_json("back"))
+            # coordinator
+            return _make_agent_response(_make_coordinator_json("none"))
+
+        mock_agent = MagicMock()
+        mock_agent.run.side_effect = partial_run
+
+        for subdir in [
+            "diagnosis/bust",
+            "diagnosis/waist_hip",
+            "diagnosis/back",
+            "diagnosis/shoulder_sleeve",
+            "diagnosis/coordinator",
+        ]:
+            (tmp_path / subdir).mkdir(parents=True, exist_ok=True)
+        (tmp_path / "diagnosis/bust/v1_baseline.md").write_text("Bust.")
+        (tmp_path / "diagnosis/waist_hip/v1_baseline.md").write_text("Waist/hip.")
+        (tmp_path / "diagnosis/back/v1_baseline.md").write_text("Back.")
+        (tmp_path / "diagnosis/shoulder_sleeve/v1_baseline.md").write_text("Shoulder/sleeve.")
+        (tmp_path / "diagnosis/coordinator/v1_baseline.md").write_text(
+            "Synthesise: {{specialist_outputs}}"
+        )
+
+        images = [b"img"]
+
+        with caplog.at_level(logging.WARNING, logger="lib.diagnosis.multi_agent"):
+            with patch("lib.diagnosis.multi_agent._PROMPTS_ROOT", tmp_path):
+                result = await run_diagnosis(images, lambda: mock_agent)
+
+        # Degraded gracefully — result still produced
+        assert isinstance(result, DiagnosisResult)
+        # Warning logged for the failed shoulder_sleeve specialist
+        warning_messages = [r.message for r in caplog.records if r.levelno >= logging.WARNING]
+        assert any("shoulder_sleeve" in msg for msg in warning_messages)
+
+    async def test_all_shoulder_sleeve_issues_coordinator_returns_cascade_none(
+        self, tmp_path: Path
+    ) -> None:
+        """AC #6: when coordinator receives only shoulder_sleeve issues, cascade_type is 'none'.
+
+        All four specialists return shoulder_sleeve issues. The mocked coordinator
+        returns cascade_type='none' (as the real coordinator should, per the prompt
+        guidance that shoulder/sleeve issues map to 'none'). The DiagnosisResult
+        must reflect that cascade_type.
+        """
+        from lib.diagnosis.multi_agent import DiagnosisResult, run_diagnosis
+
+        # All four specialists return shoulder_sleeve issues
+        shoulder_json = _make_specialist_json("shoulder_sleeve", "forward_shoulder")
+        # Coordinator returns cascade_type='none' because primary finding is shoulder/sleeve
+        coordinator_json = _make_coordinator_json("none")
+
+        mock_agent = _make_mock_agent(
+            [shoulder_json, shoulder_json, shoulder_json, shoulder_json, coordinator_json]
+        )
+
+        for subdir in [
+            "diagnosis/bust",
+            "diagnosis/waist_hip",
+            "diagnosis/back",
+            "diagnosis/shoulder_sleeve",
+            "diagnosis/coordinator",
+        ]:
+            (tmp_path / subdir).mkdir(parents=True, exist_ok=True)
+        (tmp_path / "diagnosis/bust/v1_baseline.md").write_text("Bust.")
+        (tmp_path / "diagnosis/waist_hip/v1_baseline.md").write_text("Waist/hip.")
+        (tmp_path / "diagnosis/back/v1_baseline.md").write_text("Back.")
+        (tmp_path / "diagnosis/shoulder_sleeve/v1_baseline.md").write_text("Shoulder/sleeve.")
+        (tmp_path / "diagnosis/coordinator/v1_baseline.md").write_text(
+            "Synthesise: {{specialist_outputs}}"
+        )
+
+        images = [b"img"]
+
+        with patch("lib.diagnosis.multi_agent._PROMPTS_ROOT", tmp_path):
+            result = await run_diagnosis(images, _make_agent_factory(mock_agent))
+
+        assert isinstance(result, DiagnosisResult)
+        assert result.cascade_type == "none"
