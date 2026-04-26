@@ -285,7 +285,7 @@ async def run_diagnosis(
 ) -> DiagnosisResult:
     """Run multi-agent fit diagnosis on the provided images.
 
-    Fans out to three specialist agents (bust, waist/hip, back) concurrently via
+    Fans out to four specialist agents (bust, waist/hip, back, shoulder/sleeve) concurrently via
     asyncio.gather + asyncio.to_thread, then runs a coordinator agent to synthesise
     the results.
 
@@ -303,7 +303,7 @@ async def run_diagnosis(
         AllSpecialistsFailedError: If all specialist agents fail.
         CoordinatorParseError: If the coordinator returns an unparseable response.
     """
-    # Fan out three specialists concurrently
+    # Fan out four specialists concurrently
     specialist_tasks = [
         asyncio.to_thread(_run_specialist, region, agent_factory(), images)
         for region in _SPECIALIST_REGIONS

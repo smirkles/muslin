@@ -531,3 +531,48 @@ class TestShoulderSleeveSpecialist:
         # Warning logged for the failed shoulder_sleeve specialist
         warning_messages = [r.message for r in caplog.records if r.levelno >= logging.WARNING]
         assert any("shoulder_sleeve" in msg for msg in warning_messages)
+
+    async def test_all_shoulder_sleeve_issues_coordinator_returns_cascade_none(
+        self, tmp_path: Path
+    ) -> None:
+        """AC #6: when coordinator receives only shoulder_sleeve issues, cascade_type is 'none'.
+
+        All four specialists return shoulder_sleeve issues. The mocked coordinator
+        returns cascade_type='none' (as the real coordinator should, per the prompt
+        guidance that shoulder/sleeve issues map to 'none'). The DiagnosisResult
+        must reflect that cascade_type.
+        """
+        from lib.diagnosis.multi_agent import DiagnosisResult, run_diagnosis
+
+        # All four specialists return shoulder_sleeve issues
+        shoulder_json = _make_specialist_json("shoulder_sleeve", "forward_shoulder")
+        # Coordinator returns cascade_type='none' because primary finding is shoulder/sleeve
+        coordinator_json = _make_coordinator_json("none")
+
+        mock_agent = _make_mock_agent(
+            [shoulder_json, shoulder_json, shoulder_json, shoulder_json, coordinator_json]
+        )
+
+        for subdir in [
+            "diagnosis/bust",
+            "diagnosis/waist_hip",
+            "diagnosis/back",
+            "diagnosis/shoulder_sleeve",
+            "diagnosis/coordinator",
+        ]:
+            (tmp_path / subdir).mkdir(parents=True, exist_ok=True)
+        (tmp_path / "diagnosis/bust/v1_baseline.md").write_text("Bust.")
+        (tmp_path / "diagnosis/waist_hip/v1_baseline.md").write_text("Waist/hip.")
+        (tmp_path / "diagnosis/back/v1_baseline.md").write_text("Back.")
+        (tmp_path / "diagnosis/shoulder_sleeve/v1_baseline.md").write_text("Shoulder/sleeve.")
+        (tmp_path / "diagnosis/coordinator/v1_baseline.md").write_text(
+            "Synthesise: {{specialist_outputs}}"
+        )
+
+        images = [b"img"]
+
+        with patch("lib.diagnosis.multi_agent._PROMPTS_ROOT", tmp_path):
+            result = await run_diagnosis(images, _make_agent_factory(mock_agent))
+
+        assert isinstance(result, DiagnosisResult)
+        assert result.cascade_type == "none"

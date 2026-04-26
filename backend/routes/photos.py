@@ -5,10 +5,12 @@ All business logic lives in lib/photos/ and lib/segmentation/.
 """
 
 import logging
+import os
 import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Form, HTTPException, UploadFile
+from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
 from lib.measurements import get_measurements
@@ -18,6 +20,7 @@ from lib.photos.validate import (
     PhotoTooLargeError,
     validate_photo,
 )
+from lib.segmentation.passthrough_segmenter import PassthroughSegmenter
 from lib.segmentation.replicate_segmenter import ReplicateSegmenter
 from lib.segmentation.segmenter import ConfigError, Segmenter
 
@@ -104,6 +107,18 @@ async def upload_photos(
     return records
 
 
+@router.get("/photos/{photo_id}/image")
+def get_photo_image(photo_id: str) -> Response:
+    """Serve raw image bytes for a previously uploaded photo."""
+    try:
+        photo_path = lookup_photo_by_id(photo_id)
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail="Photo not found") from exc
+    suffix = photo_path.suffix.lower()
+    media_type = "image/png" if suffix == ".png" else "image/jpeg"
+    return Response(content=photo_path.read_bytes(), media_type=media_type)
+
+
 def _get_extension(filename: str) -> str:
     """Return the lowercase extension including dot, or '.jpg' as fallback."""
     dot_pos = filename.rfind(".")
@@ -135,9 +150,14 @@ class SegmentResponse(BaseModel):
 def get_segmenter() -> Segmenter:
     """Return the segmenter instance used by the segment endpoint.
 
+    Uses ReplicateSegmenter when REPLICATE_API_TOKEN is configured,
+    otherwise falls back to PassthroughSegmenter (copies original as crop).
     Extracted so tests can patch it cleanly.
     """
-    return ReplicateSegmenter()
+    if os.environ.get("REPLICATE_API_TOKEN"):
+        return ReplicateSegmenter()
+    logger.info("REPLICATE_API_TOKEN not set — using PassthroughSegmenter")
+    return PassthroughSegmenter()
 
 
 @router.post("/photos/{photo_id}/segment", response_model=SegmentResponse)

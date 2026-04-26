@@ -10,6 +10,7 @@ Environment variables:
 """
 
 import base64
+import io
 import logging
 import os
 from pathlib import Path
@@ -22,6 +23,25 @@ from lib.diagnosis.prompts import load_prompt, substitute
 logger = logging.getLogger(__name__)
 
 _DEFAULT_MODEL = "claude-opus-4-7"
+
+
+_MAX_IMAGE_BYTES = 4 * 1024 * 1024  # 4 MB — Anthropic limit is 5 MB, keep headroom
+
+
+def _resize_if_needed(image_bytes: bytes) -> bytes:
+    """Resize image to fit within Anthropic's 5 MB limit, preserving aspect ratio."""
+    if len(image_bytes) <= _MAX_IMAGE_BYTES:
+        return image_bytes
+    from PIL import Image
+
+    img = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    scale = (_MAX_IMAGE_BYTES / len(image_bytes)) ** 0.5
+    new_w = max(1, int(img.width * scale))
+    new_h = max(1, int(img.height * scale))
+    img = img.resize((new_w, new_h), Image.LANCZOS)
+    buf = io.BytesIO()
+    img.save(buf, format="JPEG", quality=85)
+    return buf.getvalue()
 
 
 def _detect_media_type(image_bytes: bytes) -> str:
@@ -93,7 +113,7 @@ class AnthropicAgent:
 
         # Build message content
         if images:
-            # Attach image blocks before the text block
+            resized = [_resize_if_needed(img) for img in images]
             content: str | list[dict] = [
                 {
                     "type": "image",
@@ -103,7 +123,7 @@ class AnthropicAgent:
                         "data": base64.b64encode(img).decode(),
                     },
                 }
-                for img in images
+                for img in resized
             ] + [{"type": "text", "text": rendered_prompt}]
         else:
             # Text-only: keep original string form for backward compatibility
