@@ -45,4 +45,20 @@ describe("useWizardStore", () => {
     useWizardStore.getState().reset();
     expect(useWizardStore.getState().patternId).toBe("bodice-classic");
   });
+
+  it("has currentStepIndex as 0 in initial state", () => {
+    const state = useWizardStore.getState();
+    expect(state.currentStepIndex).toBe(0);
+  });
+
+  it("setCurrentStepIndex updates the store", () => {
+    useWizardStore.getState().setCurrentStepIndex(3);
+    expect(useWizardStore.getState().currentStepIndex).toBe(3);
+  });
+
+  it("reset zeroes currentStepIndex back to 0", () => {
+    useWizardStore.getState().setCurrentStepIndex(5);
+    useWizardStore.getState().reset();
+    expect(useWizardStore.getState().currentStepIndex).toBe(0);
+  });
 });

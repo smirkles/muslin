@@ -28,20 +28,6 @@ export class ApiValidationError extends Error {
   }
 }
 
-/** Fetch the SMPL body mesh GLB for a given measurement_id. */
-export async function fetchBodyMesh(measurementId: string): Promise<ArrayBuffer> {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-  const res = await fetch(`${apiUrl}/body/mesh`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ measurement_id: measurementId }),
-  });
-  if (!res.ok) {
-    throw new Error(`API error ${res.status}`);
-  }
-  return res.arrayBuffer();
-}
-
 /** Post photos to the backend and return the list of PhotoRecord objects. */
 export async function postPhotos(
   measurementId: string,
@@ -164,6 +150,66 @@ export async function downloadPattern(
     throw new Error(`API error ${res.status}`);
   }
   return res.blob();
+}
+
+// ── Pattern fetch ─────────────────────────────────────────────────────────────
+
+export interface PatternDetail {
+  id: string;
+  name: string;
+  description: string;
+  piece_count: number;
+  svg: string;
+}
+
+/** Fetch a pattern by ID and return the full detail including SVG. */
+export async function fetchPattern(patternId: string): Promise<PatternDetail> {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const res = await fetch(`${apiUrl}/patterns/${patternId}`, {
+    method: "GET",
+  });
+  if (!res.ok) {
+    throw new Error(`API error ${res.status}`);
+  }
+  return res.json();
+}
+
+// ── Cascade ───────────────────────────────────────────────────────────────────
+
+export interface CascadeStepApiResponse {
+  step_number: number;
+  narration: string;
+  svg: string;
+}
+
+export interface CascadeScriptApiResponse {
+  adjustment_type: string;
+  pattern_id: string;
+  amount_cm: number;
+  steps: CascadeStepApiResponse[];
+  seam_adjustments: Record<string, number>;
+}
+
+/** Apply a fit adjustment cascade and return the step-by-step script. */
+export async function applyAdjustment(
+  patternId: string,
+  adjustmentType: string,
+  amountCm: number,
+): Promise<CascadeScriptApiResponse> {
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  const res = await fetch(`${apiUrl}/cascades/apply-adjustment`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      pattern_id: patternId,
+      adjustment_type: adjustmentType,
+      amount_cm: amountCm,
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`API error ${res.status}`);
+  }
+  return res.json();
 }
 
 // ── Measurements ──────────────────────────────────────────────────────────────
