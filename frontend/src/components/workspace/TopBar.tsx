@@ -15,15 +15,6 @@ export function TopBar() {
         muslin
       </div>
 
-      {/* Pattern name chip */}
-      <button
-        type="button"
-        className="bg-violet-50 text-violet-700 text-xs font-medium px-3 py-1.5 rounded-full border border-violet-200 hover:bg-violet-100 transition-colors"
-      >
-        Classic Bodice Block ▾
-        {/* TODO: pattern picker dropdown */}
-      </button>
-
       {/* Cascade status chip — visible during cascade */}
       {cascadeScript && (
         <div className="bg-violet-900 text-violet-200 text-xs font-medium px-3 py-1.5 rounded-full">
