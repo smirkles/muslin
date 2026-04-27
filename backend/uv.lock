@@ -462,6 +462,67 @@ wheels = [
 ]
 
 [[package]]
+name = "iris-tailor-backend"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "anthropic" },
+    { name = "fastapi" },
+    { name = "fpdf2" },
+    { name = "httpx" },
+    { name = "lxml" },
+    { name = "numpy" },
+    { name = "pillow" },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "python-multipart" },
+    { name = "replicate" },
+    { name = "trimesh" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "black" },
+    { name = "hypothesis" },
+    { name = "mypy" },
+    { name = "pygltflib" },
+    { name = "pytest" },
+    { name = "pytest-asyncio" },
+    { name = "pytest-cov" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "anthropic", specifier = ">=0.40,<1" },
+    { name = "fastapi", specifier = ">=0.110.0" },
+    { name = "fpdf2", specifier = ">=2.7.0" },
+    { name = "httpx", specifier = ">=0.27.0" },
+    { name = "lxml", specifier = ">=5.1.0" },
+    { name = "numpy", specifier = ">=1.26.0" },
+    { name = "pillow", specifier = ">=10.2.0" },
+    { name = "pydantic", specifier = ">=2.6.0" },
+    { name = "python-dotenv", specifier = ">=1.0.0" },
+    { name = "python-multipart", specifier = ">=0.0.9" },
+    { name = "replicate", specifier = ">=1.0.7" },
+    { name = "trimesh", specifier = ">=4.12.1" },
+    { name = "uvicorn", extras = ["standard"], specifier = ">=0.27.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "black", specifier = ">=24.2.0" },
+    { name = "hypothesis", specifier = ">=6.98.0" },
+    { name = "mypy", specifier = ">=1.8.0" },
+    { name = "pygltflib", specifier = ">=1.16.5" },
+    { name = "pytest", specifier = ">=8.0.0" },
+    { name = "pytest-asyncio", specifier = ">=0.23.0" },
+    { name = "pytest-cov", specifier = ">=4.1.0" },
+    { name = "ruff", specifier = ">=0.3.0" },
+]
+
+[[package]]
 name = "jiter"
 version = "0.14.0"
 source = { registry = "https://pypi.org/simple" }
@@ -736,67 +797,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/55/79/de6c16cc902f4fc372236926b0ce2ab7845268dcc30fb2fbb7f71b418631/marshmallow-3.26.2.tar.gz", hash = "sha256:bbe2adb5a03e6e3571b573f42527c6fe926e17467833660bebd11593ab8dfd57", size = 222095, upload-time = "2025-12-22T06:53:53.309Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/be/2f/5108cb3ee4ba6501748c4908b908e55f42a5b66245b4cfe0c99326e1ef6e/marshmallow-3.26.2-py3-none-any.whl", hash = "sha256:013fa8a3c4c276c24d26d84ce934dc964e2aa794345a0f8c7e5a7191482c8a73", size = 50964, upload-time = "2025-12-22T06:53:51.801Z" },
-]
-
-[[package]]
-name = "muslin-backend"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "anthropic" },
-    { name = "fastapi" },
-    { name = "fpdf2" },
-    { name = "httpx" },
-    { name = "lxml" },
-    { name = "numpy" },
-    { name = "pillow" },
-    { name = "pydantic" },
-    { name = "python-dotenv" },
-    { name = "python-multipart" },
-    { name = "replicate" },
-    { name = "trimesh" },
-    { name = "uvicorn", extra = ["standard"] },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "black" },
-    { name = "hypothesis" },
-    { name = "mypy" },
-    { name = "pygltflib" },
-    { name = "pytest" },
-    { name = "pytest-asyncio" },
-    { name = "pytest-cov" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "anthropic", specifier = ">=0.40,<1" },
-    { name = "fastapi", specifier = ">=0.110.0" },
-    { name = "fpdf2", specifier = ">=2.7.0" },
-    { name = "httpx", specifier = ">=0.27.0" },
-    { name = "lxml", specifier = ">=5.1.0" },
-    { name = "numpy", specifier = ">=1.26.0" },
-    { name = "pillow", specifier = ">=10.2.0" },
-    { name = "pydantic", specifier = ">=2.6.0" },
-    { name = "python-dotenv", specifier = ">=1.0.0" },
-    { name = "python-multipart", specifier = ">=0.0.9" },
-    { name = "replicate", specifier = ">=1.0.7" },
-    { name = "trimesh", specifier = ">=4.12.1" },
-    { name = "uvicorn", extras = ["standard"], specifier = ">=0.27.0" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "black", specifier = ">=24.2.0" },
-    { name = "hypothesis", specifier = ">=6.98.0" },
-    { name = "mypy", specifier = ">=1.8.0" },
-    { name = "pygltflib", specifier = ">=1.16.5" },
-    { name = "pytest", specifier = ">=8.0.0" },
-    { name = "pytest-asyncio", specifier = ">=0.23.0" },
-    { name = "pytest-cov", specifier = ">=4.1.0" },
-    { name = "ruff", specifier = ">=0.3.0" },
 ]
 
 [[package]]
