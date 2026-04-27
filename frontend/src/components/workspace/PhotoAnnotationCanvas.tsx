@@ -18,15 +18,15 @@ function getRegionForIssue(issueType: string): RegionHint {
 
   // Neck / collar / neckline — checked before "back" so "neckline_gaping_at_back" lands here, not upper-back
   if (t.includes("neck") || t.includes("collar")) {
-    return { cx: 50, cy: 17, rx: 18, ry: 7, preferredView: "front" };
+    return { cx: 50, cy: 22, rx: 18, ry: 7, preferredView: "front" };
   }
   // Shoulder — separate from neck
   if (t.includes("shoulder")) {
-    return { cx: 50, cy: 23, rx: 26, ry: 8, preferredView: "front" };
+    return { cx: 50, cy: 30, rx: 26, ry: 8, preferredView: "front" };
   }
   // Sleeve / armhole
   if (t.includes("sleeve") || t.includes("armhole") || t.includes("arm")) {
-    return { cx: 50, cy: 29, rx: 28, ry: 9, preferredView: "front" };
+    return { cx: 50, cy: 35, rx: 28, ry: 9, preferredView: "front" };
   }
   // Bust / chest / dart
   if (t.includes("bust") || t.includes("chest") || t.includes("fba") || t.includes("dart")) {
