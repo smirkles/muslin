@@ -7,7 +7,7 @@
 
 ## What it does
 
-A React form component (`<MeasurementForm />`) where the user enters their body measurements. It validates inputs client-side and calls an `onSubmit` callback with the validated data when the user submits. This is the first real user-facing UI element in the product — the moment a user tells Muslin about their body.
+A React form component (`<MeasurementForm />`) where the user enters their body measurements. It validates inputs client-side and calls an `onSubmit` callback with the validated data when the user submits. This is the first real user-facing UI element in the product — the moment a user tells Iris Tailor about their body.
 
 No API calls inside the component. The parent page wires it to the backend. This keeps the component fully testable in isolation.
 

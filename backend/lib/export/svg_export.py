@@ -10,4 +10,4 @@ from lib.grading import GradedPattern
 
 def build_svg_download(graded: GradedPattern) -> tuple[str, str]:
     """Return (svg_string, filename) for a graded pattern SVG download."""
-    return graded.svg, "muslin-pattern.svg"
+    return graded.svg, "iris-tailor-pattern.svg"

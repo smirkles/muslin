@@ -1,4 +1,4 @@
-"""Pure utility functions for the Muslin backend."""
+"""Pure utility functions for the Iris Tailor backend."""
 
 
 def reverse_string(s: str) -> str:

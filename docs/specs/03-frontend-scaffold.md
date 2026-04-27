@@ -24,9 +24,9 @@ Not applicable — this is infrastructure, not a function.
 
 ## Acceptance criteria
 
-- [x] `frontend/package.json` exists with `name: "muslin-frontend"`, scripts for `dev`, `build`, `test`, `lint`.
+- [x] `frontend/package.json` exists with `name: "iris-tailor-frontend"`, scripts for `dev`, `build`, `test`, `lint`.
 - [x] `pnpm dev` starts a Next.js 14 App Router dev server without errors.
-- [x] `frontend/src/app/page.tsx` renders a page with the text "Muslin" (any styling is fine).
+- [x] `frontend/src/app/page.tsx` renders a page with the text "Iris Tailor" (any styling is fine).
 - [x] `frontend/src/app/layout.tsx` exists with a root layout wrapping children in a `<body>`.
 - [x] TypeScript is configured in strict mode (`tsconfig.json` with `"strict": true`).
 - [x] Tailwind CSS is installed and a `globals.css` imports the Tailwind directives.
@@ -63,7 +63,7 @@ Not applicable — this is infrastructure, not a function.
 ## Testing approach
 
 - **Acceptance tests:** run `pnpm test`, `pnpm lint`, `pnpm build` — all must exit 0.
-- **Manual:** `pnpm dev` → open localhost:3000 → see "Muslin" on screen.
+- **Manual:** `pnpm dev` → open localhost:3000 → see "Iris Tailor" on screen.
 - **Regression:** confirm spec 02's `utils.test.ts` is the file running (check test output names match).
 
 ## Open questions
@@ -94,7 +94,7 @@ Manually scaffolded the full Next.js 14 App Router project in `frontend/` withou
 - `frontend/src/test/setup.ts` — imports `@testing-library/jest-dom`
 - `frontend/src/app/globals.css` — Tailwind directives
 - `frontend/src/app/layout.tsx` — root layout with `<html>` and `<body>`
-- `frontend/src/app/page.tsx` — renders "Muslin" heading
+- `frontend/src/app/page.tsx` — renders "Iris Tailor" heading
 - `frontend/src/lib/utils.ts` — preserved exactly from spec 02
 - `frontend/src/lib/utils.test.ts` — preserved exactly from spec 02
 

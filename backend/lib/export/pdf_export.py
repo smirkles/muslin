@@ -117,7 +117,7 @@ class _PatternPDF(FPDF):
             f"Back length {meas.back_length_cm:.0f} cm"
         )
         self.set_font("Helvetica", "B", 10)
-        self.cell(0, 6, "Muslin - Adjusted Pattern", new_x="LMARGIN", new_y="NEXT")
+        self.cell(0, 6, "Iris Tailor - Adjusted Pattern", new_x="LMARGIN", new_y="NEXT")
         self.set_font("Helvetica", "", 8)
         piece_line = (
             f"{self._today.isoformat()} · {self._graded.pattern_id} · {self.current_piece_id}"
@@ -195,4 +195,4 @@ def build_pdf_download(
         finally:
             os.unlink(tmp_path)
 
-    return bytes(pdf.output()), "muslin-pattern.pdf"
+    return bytes(pdf.output()), "iris-tailor-pattern.pdf"

@@ -1,4 +1,4 @@
-"""Muslin FastAPI application entry point."""
+"""Iris Tailor FastAPI application entry point."""
 
 import os
 
@@ -17,8 +17,8 @@ from routes.photos import router as photos_router
 load_dotenv(".env.local")
 
 app = FastAPI(
-    title="Muslin API",
-    description="Backend for Muslin — sewing pattern adjustment via AI.",
+    title="Iris Tailor API",
+    description="Backend for Iris Tailor — sewing pattern adjustment via AI.",
     version="0.1.0",
 )
 

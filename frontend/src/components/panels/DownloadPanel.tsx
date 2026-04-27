@@ -23,7 +23,7 @@ export function DownloadPanel() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `muslin-adjusted.${format}`;
+      a.download = `iris-tailor-adjusted.${format}`;
       a.click();
       URL.revokeObjectURL(url);
     } catch {

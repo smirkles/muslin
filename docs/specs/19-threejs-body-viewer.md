@@ -7,7 +7,7 @@
 
 ## What it does
 
-A rotatable 3D body viewer. After the user submits their measurements, Muslin generates a SMPL neutral body mesh scaled to approximate those measurements and renders it in a Three.js canvas. The user can rotate, zoom, and orbit the body to see their shape from any angle. This is must-have feature #7 in the v2 plan ("Static 3D body view"). No garment is drawn on the body in V1 — body only.
+A rotatable 3D body viewer. After the user submits their measurements, Iris Tailor generates a SMPL neutral body mesh scaled to approximate those measurements and renders it in a Three.js canvas. The user can rotate, zoom, and orbit the body to see their shape from any angle. This is must-have feature #7 in the v2 plan ("Static 3D body view"). No garment is drawn on the body in V1 — body only.
 
 ## User-facing behavior
 

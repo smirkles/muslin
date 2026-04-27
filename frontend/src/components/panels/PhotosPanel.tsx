@@ -8,21 +8,20 @@ import type { PhotoRecord } from "../../lib/api";
 import { segmentPhoto } from "../../lib/api";
 
 export function PhotosPanel() {
-  const setPhotoIds = useWizardStore((s) => s.setPhotoIds);
+  const setPhotos = useWizardStore((s) => s.setPhotos);
   const setActiveTool = useWizardStore((s) => s.setActiveTool);
   const measurementsResponse = useWizardStore((s) => s.measurementsResponse);
-  const photoIds = useWizardStore((s) => s.photoIds);
+  const photos = useWizardStore((s) => s.photos);
 
   const [isSegmenting, setIsSegmenting] = useState(false);
   const [segmentError, setSegmentError] = useState<string | null>(null);
 
-  async function handleUploadSuccess(photos: PhotoRecord[]) {
-    const ids = photos.map((p) => p.photo_id);
-    setPhotoIds(ids);
+  async function handleUploadSuccess(uploadedPhotos: PhotoRecord[]) {
+    setPhotos(uploadedPhotos.map((p) => ({ photo_id: p.photo_id, view_label: p.view_label })));
     setSegmentError(null);
     setIsSegmenting(true);
     try {
-      await Promise.all(ids.map((id) => segmentPhoto(id)));
+      await Promise.all(uploadedPhotos.map((p) => segmentPhoto(p.photo_id)));
       // Advance to diagnosis
       setActiveTool("diagnosis");
     } catch {
@@ -45,9 +44,9 @@ export function PhotosPanel() {
           </div>
         )}
 
-        {photoIds.length > 0 && (
+        {photos.length > 0 && (
           <div className="bg-sky-50 border border-sky-200 rounded-xl px-3 py-2 text-xs text-sky-700 font-medium">
-            ✓ {photoIds.length} photo{photoIds.length > 1 ? "s" : ""} uploaded
+            ✓ {photos.length} photo{photos.length > 1 ? "s" : ""} uploaded
           </div>
         )}
 

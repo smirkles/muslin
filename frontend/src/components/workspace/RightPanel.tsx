@@ -3,6 +3,13 @@
 import dynamic from "next/dynamic";
 import { useWizardStore } from "../../store/wizard";
 
+
+function formatIssueType(raw: string): string {
+  return raw
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 // Three.js touches window/document at import time — must not run under SSR
 const BodyViewer = dynamic(() => import("../BodyViewer").then((m) => m.BodyViewer), {
   ssr: false,
@@ -28,7 +35,7 @@ export function RightPanel() {
       style={{ background: "#FDF8F5", borderColor: "#E8DDD4" }}
     >
       {/* ── Body viewer ─────────────────────────────────────────────────── */}
-      <div className="flex flex-col" style={{ height: "420px" }}>
+      <div className="hidden flex flex-col" style={{ height: "420px" }}>
         <div className="px-4 pt-3 pb-1">
           <h2 className="text-xs font-bold text-gray-400 uppercase tracking-wide">
             Body preview
@@ -63,7 +70,7 @@ export function RightPanel() {
       </div>
 
       {/* Divider */}
-      <div className="h-px" style={{ background: "#E8DDD4" }} />
+      <div className="hidden h-px" style={{ background: "#E8DDD4" }} />
 
       {/* ── Contextual bottom section ────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-4 py-4">
@@ -108,32 +115,46 @@ function EmptyGuide({ onToolSelect }: { onToolSelect: (t: "measurements" | "phot
 
 function DiagnosisContext() {
   const diagnosisResult = useWizardStore((s) => s.diagnosisResult);
-  const setActiveTool = useWizardStore((s) => s.setActiveTool);
+  const selectedIssueIndex = useWizardStore((s) => s.selectedIssueIndex);
+  const setSelectedIssueIndex = useWizardStore((s) => s.setSelectedIssueIndex);
   if (!diagnosisResult) return null;
 
   return (
     <div className="flex flex-col gap-3">
       <h2 className="text-sm font-bold text-gray-700">Fit issues found</h2>
-      {diagnosisResult.issues.map((issue) => (
-        <div key={issue.issue_type} className="bg-white rounded-xl border border-gray-100 p-3 text-xs">
-          <p className="font-semibold text-gray-700 mb-1">{issue.issue_type}</p>
-          <p className="text-gray-400 mb-2">{issue.description}</p>
-          <div className="w-full bg-gray-100 rounded-full h-1.5">
-            <div
-              className="bg-rose-400 h-1.5 rounded-full"
-              style={{ width: `${issue.confidence * 100}%` }}
-            />
-          </div>
-          <p className="text-gray-400 mt-1">{Math.round(issue.confidence * 100)}% confidence</p>
-        </div>
-      ))}
-      <button
-        type="button"
-        onClick={() => setActiveTool("cascade")}
-        className="w-full bg-violet-600 text-white text-xs font-semibold py-2.5 rounded-xl hover:bg-violet-700 transition-colors"
-      >
-        Apply {diagnosisResult.cascade_type} →
-      </button>
+      {diagnosisResult.issues.map((issue, i) => {
+        const isSelected = selectedIssueIndex === i;
+        return (
+          <button
+            key={issue.issue_type}
+            type="button"
+            onClick={() => setSelectedIssueIndex(isSelected ? null : i)}
+            className={[
+              "text-left rounded-xl border p-3 text-xs shadow-sm transition-all",
+              isSelected
+                ? "bg-rose-50 border-rose-300 ring-1 ring-rose-300"
+                : "bg-white border-gray-100 hover:border-rose-200 hover:bg-rose-50/40",
+            ].join(" ")}
+          >
+            <div className="flex items-start justify-between mb-1">
+              <p className="font-semibold text-gray-700">{formatIssueType(issue.issue_type)}</p>
+              <span className="text-rose-400 font-medium text-[11px]">
+                {Math.round(issue.confidence * 100)}%
+              </span>
+            </div>
+            <p className="text-gray-400 mb-2 leading-relaxed">{issue.description}</p>
+            <div className="w-full bg-gray-100 rounded-full h-1">
+              <div
+                className={`h-1 rounded-full transition-all ${isSelected ? "bg-rose-500" : "bg-rose-400"}`}
+                style={{ width: `${issue.confidence * 100}%` }}
+              />
+            </div>
+            {isSelected && (
+              <p className="text-[10px] text-rose-400 mt-1.5">Highlighted on photo ↑</p>
+            )}
+          </button>
+        );
+      })}
     </div>
   );
 }

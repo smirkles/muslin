@@ -3,21 +3,35 @@
 import { useEffect, useState } from "react";
 import { PanelShell } from "./PanelShell";
 import { useWizardStore } from "../../store/wizard";
-import { runDiagnosis as runDiagnosisApi } from "../../lib/api";
+import { runDiagnosis as runDiagnosisApi, AiUnavailableError } from "../../lib/api";
+
+const CASCADE_LABELS: Record<string, string> = {
+  fba: "Full Bust Adjustment",
+  swayback: "Swayback Adjustment",
+  none: "No adjustment",
+};
+
+function formatIssueType(raw: string): string {
+  return raw
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
 
 export function DiagnosisPanel() {
   const measurementsResponse = useWizardStore((s) => s.measurementsResponse);
-  const photoIds = useWizardStore((s) => s.photoIds);
+  const photos = useWizardStore((s) => s.photos);
   const diagnosisResult = useWizardStore((s) => s.diagnosisResult);
   const setDiagnosisResult = useWizardStore((s) => s.setDiagnosisResult);
   const setActiveTool = useWizardStore((s) => s.setActiveTool);
+  const selectedIssueIndex = useWizardStore((s) => s.selectedIssueIndex);
+  const setSelectedIssueIndex = useWizardStore((s) => s.setSelectedIssueIndex);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Auto-run diagnosis when panel opens if we have the prerequisites
   useEffect(() => {
-    if (!diagnosisResult && measurementsResponse && photoIds.length > 0) {
+    if (!diagnosisResult && measurementsResponse && photos.length > 0) {
       runDiagnosis();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount-only: Zustand selectors are stable refs; re-running on every render would loop
@@ -25,15 +39,20 @@ export function DiagnosisPanel() {
 
   async function runDiagnosis() {
     if (!measurementsResponse) { setError("Enter measurements first."); return; }
-    if (photoIds.length === 0) { setError("Upload photos first."); return; }
+    if (photos.length === 0) { setError("Upload photos first."); return; }
 
     setIsLoading(true);
     setError(null);
     try {
-      const result = await runDiagnosisApi(measurementsResponse.measurement_id, photoIds);
+      const result = await runDiagnosisApi(measurementsResponse.measurement_id, photos.map((p) => p.photo_id));
       setDiagnosisResult(result);
-    } catch {
-      setError("Diagnosis failed — please try again.");
+      setActiveTool(null);
+    } catch (err) {
+      setError(
+        err instanceof AiUnavailableError
+          ? "Our AI service is unavailable right now — please try again in a moment."
+          : "Diagnosis failed — please try again."
+      );
     } finally {
       setIsLoading(false);
     }
@@ -91,27 +110,40 @@ export function DiagnosisPanel() {
 
             {/* Issue cards */}
             <div className="flex flex-col gap-3">
-              {diagnosisResult.issues.map((issue) => (
-                <div
-                  key={issue.issue_type}
-                  className="bg-white rounded-xl border border-gray-100 p-3 text-xs shadow-sm"
-                >
-                  <div className="flex items-start justify-between mb-1">
-                    <p className="font-semibold text-gray-700">{issue.issue_type}</p>
-                    <span className="text-rose-400 font-medium text-[11px]">
-                      {Math.round(issue.confidence * 100)}%
-                    </span>
-                  </div>
-                  <p className="text-gray-400 mb-2 leading-relaxed">{issue.description}</p>
-                  {/* Confidence bar */}
-                  <div className="w-full bg-gray-100 rounded-full h-1">
-                    <div
-                      className="bg-rose-400 h-1 rounded-full transition-all"
-                      style={{ width: `${issue.confidence * 100}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
+              {diagnosisResult.issues.map((issue, i) => {
+                const isSelected = selectedIssueIndex === i;
+                return (
+                  <button
+                    key={issue.issue_type}
+                    type="button"
+                    onClick={() => setSelectedIssueIndex(isSelected ? null : i)}
+                    className={[
+                      "text-left rounded-xl border p-3 text-xs shadow-sm transition-all",
+                      isSelected
+                        ? "bg-rose-50 border-rose-300 ring-1 ring-rose-300"
+                        : "bg-white border-gray-100 hover:border-rose-200 hover:bg-rose-50/40",
+                    ].join(" ")}
+                  >
+                    <div className="flex items-start justify-between mb-1">
+                      <p className="font-semibold text-gray-700">{formatIssueType(issue.issue_type)}</p>
+                      <span className="text-rose-400 font-medium text-[11px]">
+                        {Math.round(issue.confidence * 100)}%
+                      </span>
+                    </div>
+                    <p className="text-gray-400 mb-2 leading-relaxed">{issue.description}</p>
+                    {/* Confidence bar */}
+                    <div className="w-full bg-gray-100 rounded-full h-1">
+                      <div
+                        className={`h-1 rounded-full transition-all ${isSelected ? "bg-rose-500" : "bg-rose-400"}`}
+                        style={{ width: `${issue.confidence * 100}%` }}
+                      />
+                    </div>
+                    {isSelected && (
+                      <p className="text-[10px] text-rose-400 mt-1.5">Highlighted on photo →</p>
+                    )}
+                  </button>
+                );
+              })}
             </div>
 
             {/* Recommendation callout */}
@@ -128,7 +160,7 @@ export function DiagnosisPanel() {
               onClick={() => setActiveTool("cascade")}
               className="w-full bg-rose-500 text-white text-xs font-semibold py-3 rounded-xl hover:bg-rose-600 transition-colors"
             >
-              Apply {diagnosisResult.cascade_type} →
+              Apply {CASCADE_LABELS[diagnosisResult.cascade_type] ?? formatIssueType(diagnosisResult.cascade_type)} →
             </button>
 
             <button

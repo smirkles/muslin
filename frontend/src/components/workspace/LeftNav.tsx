@@ -20,7 +20,7 @@ export function LeftNav() {
       style={{ background: "#1E1B4B" }}
       aria-label="Tools"
     >
-      {TOOLS.map((tool) => {
+      {TOOLS.filter((t) => t.id !== "cascade" && t.id !== "download").map((tool) => {
         const isActive = activeTool === tool.id;
         return (
           <div key={tool.id} className="relative w-full flex justify-center">

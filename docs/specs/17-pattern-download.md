@@ -11,9 +11,9 @@ Lets a user download their adjusted pattern — either the size-graded baseline 
 
 ## User-facing behavior
 
-On the results page after grading and (optionally) a cascade, a "Download" button appears with a two-state toggle: **SVG** and **PDF**. Clicking "Download" triggers a browser download of `muslin-pattern.svg` or `muslin-pattern.pdf`. While the PDF is rendering, the button shows a loading state. On error, an inline message appears. The button is disabled until a `graded_pattern_id` is present in the wizard store.
+On the results page after grading and (optionally) a cascade, a "Download" button appears with a two-state toggle: **SVG** and **PDF**. Clicking "Download" triggers a browser download of `iris-tailor-pattern.svg` or `iris-tailor-pattern.pdf`. While the PDF is rendering, the button shows a loading state. On error, an inline message appears. The button is disabled until a `graded_pattern_id` is present in the wizard store.
 
-The PDF header reads: **Muslin — Adjusted Pattern**, followed by the current date, the `pattern_id`, and a one-line measurement summary (e.g. `Bust 96 cm · Waist 78 cm · Hip 104 cm · Back length 41 cm`). A footer on every page reads: `Seam allowance: 1.5 cm — already included · Page N of M`.
+The PDF header reads: **Iris Tailor — Adjusted Pattern**, followed by the current date, the `pattern_id`, and a one-line measurement summary (e.g. `Bust 96 cm · Waist 78 cm · Hip 104 cm · Back length 41 cm`). A footer on every page reads: `Seam allowance: 1.5 cm — already included · Page N of M`.
 
 ## Inputs and outputs
 
@@ -30,11 +30,11 @@ GET /patterns/download/{graded_pattern_id}?format=pdf
 
 **SVG (200):**
 - `Content-Type: image/svg+xml`
-- `Content-Disposition: attachment; filename="muslin-pattern.svg"`
+- `Content-Disposition: attachment; filename="iris-tailor-pattern.svg"`
 
 **PDF (200):**
 - `Content-Type: application/pdf`
-- `Content-Disposition: attachment; filename="muslin-pattern.pdf"`
+- `Content-Disposition: attachment; filename="iris-tailor-pattern.pdf"`
 - One pattern piece per A4 page at 1:1 physical scale.
 
 ### Errors
@@ -63,7 +63,7 @@ def build_pdf_download(
 
 ### Library — SVG
 
-- [ ] Given a `GradedPattern` with a valid SVG, `build_svg_download` returns that exact string as the first element and `"muslin-pattern.svg"` as the second.
+- [ ] Given a `GradedPattern` with a valid SVG, `build_svg_download` returns that exact string as the first element and `"iris-tailor-pattern.svg"` as the second.
 - [ ] `backend/lib/export/` contains no `fastapi` imports (import-hygiene test).
 
 ### Library — PDF
@@ -71,7 +71,7 @@ def build_pdf_download(
 - [ ] `build_pdf_download` returns bytes starting with `%PDF-`.
 - [ ] Given a pattern with 4 top-level `<g>` piece elements, the PDF has 4 pages.
 - [ ] Every page is A4 portrait — 595 x 842 PDF points (±1 pt).
-- [ ] Every page contains `"Muslin — Adjusted Pattern"` in its header (via `pypdf` text extraction).
+- [ ] Every page contains `"Iris Tailor — Adjusted Pattern"` in its header (via `pypdf` text extraction).
 - [ ] Every page header contains the ISO date string for the `today` argument.
 - [ ] Every page header contains the four measurement values formatted in cm.
 - [ ] Every page footer contains `"Seam allowance: 1.5 cm"` and `"Page <n> of <m>"`.

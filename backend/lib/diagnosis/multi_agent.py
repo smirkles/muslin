@@ -263,7 +263,7 @@ def _run_specialist(
             prompt_name,
             variables={},
             images=images,
-            max_tokens=1024,
+            max_tokens=2048,
         )
         return _parse_specialist(region, response.text)
     except ConfigError:
@@ -349,7 +349,7 @@ async def run_diagnosis(
         "diagnosis/coordinator",
         {"specialist_outputs": specialist_outputs},
         None,  # no images for coordinator
-        1024,  # max_tokens
+        4096,  # coordinator synthesises all specialists — needs more headroom than 1024
     )
 
     return _parse_coordinator(coordinator_response.text)

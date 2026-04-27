@@ -179,7 +179,7 @@ export function PhotoUpload({ measurementId, onSuccess }: PhotoUploadProps) {
                     onChange={(e) =>
                       handleLabelChange(idx, e.target.value as ViewLabel | "")
                     }
-                    className="w-full rounded border border-gray-300 px-2 py-1 text-sm"
+                    className="w-full rounded border border-gray-300 px-2 py-1 text-sm focus:outline-none focus:border-indigo-400 focus:ring-1 focus:ring-indigo-400"
                     aria-label={`View label for ${item.file.name}`}
                   >
                     <option value="">Select view…</option>

@@ -1,7 +1,7 @@
 [project]
-name = "muslin-backend"
+name = "iris-tailor-backend"
 version = "0.1.0"
-description = "Backend for Muslin — sewing pattern adjustment via AI"
+description = "Backend for Iris Tailor — sewing pattern adjustment via AI"
 readme = "../README.md"
 requires-python = ">=3.11"
 dependencies = [

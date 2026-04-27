@@ -3,9 +3,11 @@
 import { useEffect, useState } from "react";
 import { useWizardStore } from "../../store/wizard";
 import { fetchPattern } from "../../lib/api";
+import { PhotoAnnotationCanvas } from "./PhotoAnnotationCanvas";
 
 export function PatternCanvas() {
   const cascadeScript = useWizardStore((s) => s.cascadeScript);
+  const diagnosisResult = useWizardStore((s) => s.diagnosisResult);
 
   return (
     <main
@@ -27,6 +29,8 @@ export function PatternCanvas() {
       <div className="relative flex-1 flex items-center justify-center">
         {cascadeScript ? (
           <CascadeCanvas />
+        ) : diagnosisResult ? (
+          <PhotoAnnotationCanvas />
         ) : (
           <PatternDisplay />
         )}

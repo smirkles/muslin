@@ -23,7 +23,6 @@ const PATTERNS = [
 export function TopBar() {
   const measurementsResponse = useWizardStore((s) => s.measurementsResponse);
   const cascadeScript = useWizardStore((s) => s.cascadeScript);
-  const setActiveTool = useWizardStore((s) => s.setActiveTool);
   const activeTool = useWizardStore((s) => s.activeTool);
   const patternId = useWizardStore((s) => s.patternId);
   const setPatternId = useWizardStore((s) => s.setPatternId);
@@ -48,7 +47,7 @@ export function TopBar() {
     <header className="h-[52px] bg-white border-b border-gray-200 flex items-center px-3 gap-3 shrink-0 z-20">
       {/* Logo */}
       <div className="bg-[#1E1B4B] text-white text-sm font-bold px-4 py-1.5 rounded-full select-none">
-        muslin
+        Iris Tailor
       </div>
 
       {/* Pattern picker */}
@@ -154,20 +153,6 @@ export function TopBar() {
       )}
 
       <div className="ml-auto flex items-center gap-2">
-        <button
-          type="button"
-          className="text-xs text-violet-600 bg-violet-50 border border-violet-200 px-3 py-1.5 rounded-lg hover:bg-violet-100 transition-colors"
-          onClick={() => setActiveTool("download")}
-        >
-          Save ↓
-        </button>
-        <button
-          type="button"
-          className="text-xs text-white bg-violet-600 px-3 py-1.5 rounded-lg hover:bg-violet-700 transition-colors font-medium"
-          onClick={() => setActiveTool("download")}
-        >
-          Export
-        </button>
         <button
           type="button"
           className="text-gray-400 hover:text-gray-600 text-lg w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors"

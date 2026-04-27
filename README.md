@@ -1,10 +1,10 @@
-# Muslin
+# Iris Tailor
 
 **The expert sewing friend you don't have.**
 
 Every fitted sewing project starts with a muslin — a test garment in cheap fabric, sewn to check the fit before cutting into good material. Then comes the moment a beginner gives up and an intermediate googles for an hour: standing in front of a mirror, trying to figure out why it pulls there, gapes here, bunches at the back. An experienced friend would just glance over and say "you need a swayback adjustment."
 
-Muslin is that friend. Upload your pattern, your measurements, and a photo of yourself in the muslin. Claude Opus 4.7 — orchestrated as specialist agents via Managed Agents — diagnoses fit issues from the photo, cascades corrections through the pattern, and animates each change so you learn pattern-making while the work happens.
+Iris Tailor is that friend. Upload your pattern, your measurements, and a photo of yourself in the muslin. Claude Opus 4.7 — orchestrated as specialist agents via Managed Agents — diagnoses fit issues from the photo, cascades corrections through the pattern, and animates each change so you learn pattern-making while the work happens.
 
 Built solo for Anthropic's "Built with Opus 4.7" hackathon, April 2026.
 

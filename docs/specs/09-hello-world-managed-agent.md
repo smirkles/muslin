@@ -7,7 +7,7 @@
 
 ## What it does
 
-Proves end-to-end that Claude Opus 4.7 can be invoked from the Muslin backend: an HTTP request comes in, the backend loads a prompt from `prompts/`, calls Claude via the Anthropic SDK, and returns Claude's text response. This is a trivial "hello world" — not a real diagnosis — whose only jobs are (a) verifying API keys / SDK wiring work, (b) establishing the `backend/lib/diagnosis/` package boundary so later multi-agent work can swap in Managed Agents without touching HTTP callers, and (c) seeding the `prompts/` directory pattern that Day 3 prompts will follow.
+Proves end-to-end that Claude Opus 4.7 can be invoked from the Iris Tailor backend: an HTTP request comes in, the backend loads a prompt from `prompts/`, calls Claude via the Anthropic SDK, and returns Claude's text response. This is a trivial "hello world" — not a real diagnosis — whose only jobs are (a) verifying API keys / SDK wiring work, (b) establishing the `backend/lib/diagnosis/` package boundary so later multi-agent work can swap in Managed Agents without touching HTTP callers, and (c) seeding the `prompts/` directory pattern that Day 3 prompts will follow.
 
 Per `CLAUDE.md`: "Managed Agents architecture is pending — write against the interface in `backend/lib/diagnosis/` so we can swap in later without rewriting callers." This spec creates the first such interface and its direct-SDK implementation. The guarantee this spec holds is that **HTTP routes keep routing through `backend/lib/diagnosis/`** — not that the lib's internal Protocol signature never changes.
 
@@ -66,7 +66,7 @@ Registered on the existing `routes/dev.py` router (dev-only, not for production)
 Plain markdown file loaded at request time. Contains `{{name}}` placeholder. Example content:
 
 ```
-You are a friendly assistant for a sewing pattern tool called Muslin.
+You are a friendly assistant for a sewing pattern tool called Iris Tailor.
 Greet {{name}} in one short sentence and mention you're ready to help with pattern fitting.
 Reply with only the greeting — no preamble, no markdown.
 ```

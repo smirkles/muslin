@@ -4,7 +4,7 @@ Covers AC:
 - build_pdf_download returns bytes starting with %PDF-
 - 4 <g> pieces → 4 PDF pages
 - Every page is A4 portrait (595 x 842 pt ± 1 pt)
-- Every page has "Muslin — Adjusted Pattern" in header
+- Every page has "Iris Tailor — Adjusted Pattern" in header
 - Header contains ISO date string
 - Header contains measurement values in cm
 - Footer contains "Seam allowance: 1.5 cm" and "Page N of M"
@@ -158,7 +158,7 @@ class TestBuildPdfDownload:
         pdf_bytes, _ = build_pdf_download(graded, SAMPLE_MEAS, TODAY)
         for i, text in enumerate(_page_texts(pdf_bytes)):
             assert (
-                "Muslin" in text and "Adjusted Pattern" in text
+                "Iris Tailor" in text and "Adjusted Pattern" in text
             ), f"Page {i + 1} missing title, got: {text!r}"
 
     def test_every_page_header_contains_iso_date(self) -> None:

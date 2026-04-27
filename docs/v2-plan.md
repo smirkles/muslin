@@ -1,6 +1,4 @@
-# Project Plan v2 — "The Muslin Whisperer"
-
-*(Working title — pick something better before pitching. Candidates: "Muslin", "Toile", "FitPath", "Adjust", or something with a sewing-pin / measuring-tape visual identity. TBD.)*
+# Project Plan v2 — Iris Tailor
 
 ---
 
@@ -362,7 +360,7 @@ Each day has: **Goal**, **Done When** (concrete completion criteria), **Tasks**,
 
 ## Open Decisions
 
-1. **Project name** — "The Muslin Whisperer" is a working title. Pick something better before pitch.
+1. **Project name** — "Iris Tailor" (decided).
 2. **Target garment for V1** — fitted t-shirt vs simple bodice block vs A-line skirt. T-shirt is easiest topology; bodice is most demoable for FBA/swayback. Lean bodice.
 3. **Whether to include the cascade override / "what if" controls in V1 or push to V2.**
 4. **Hosting** — local laptop demo vs deployed. Local is safer; deployed is more professional.

@@ -5,7 +5,7 @@
 
 ## Context
 
-Muslin's core capability is applying pattern adjustments (FBA, swayback, grading) based on AI-diagnosed fit issues. Two architectural options existed:
+Iris Tailor's core capability is applying pattern adjustments (FBA, swayback, grading) based on AI-diagnosed fit issues. Two architectural options existed:
 
 1. **Pure AI:** Claude predicts the entire adjusted pattern as output (e.g. Sewformer-style mesh generation).
 2. **Pure deterministic:** Hardcoded rules for every adjustment type; AI only classifies fit issues from photos.

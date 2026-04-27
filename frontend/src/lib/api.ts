@@ -117,17 +117,32 @@ export interface DiagnosisResponse {
   cascade_type: "fba" | "swayback" | "none";
 }
 
+export class AiUnavailableError extends Error {
+  constructor() {
+    super("AI unavailable");
+    this.name = "AiUnavailableError";
+  }
+}
+
 /** Run fit diagnosis using measurements and uploaded photos. */
 export async function runDiagnosis(
   measurementId: string,
   photoIds: string[],
 ): Promise<DiagnosisResponse> {
   const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-  const res = await fetch(`${apiUrl}/diagnosis/run`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ measurement_id: measurementId, photo_ids: photoIds }),
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${apiUrl}/diagnosis/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ measurement_id: measurementId, photo_ids: photoIds }),
+    });
+  } catch {
+    throw new AiUnavailableError();
+  }
+  if (res.status === 500 || res.status === 502) {
+    throw new AiUnavailableError();
+  }
   if (!res.ok) {
     throw new Error(`API error ${res.status}`);
   }

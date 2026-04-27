@@ -1,5 +1,5 @@
 /**
- * Pure utility functions for the Muslin frontend.
+ * Pure utility functions for the Iris Tailor frontend.
  */
 
 /**

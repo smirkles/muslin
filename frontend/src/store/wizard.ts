@@ -36,28 +36,35 @@ export interface CascadeScript {
 
 // ── Store ─────────────────────────────────────────────────────────────────────
 
+export interface PhotoRecord {
+  photo_id: string;
+  view_label: string;
+}
+
 interface WizardState {
   patternId: string | null;
   gradedPatternId: string | null;
   measurementsResponse: MeasurementsResponse | null;
   measurements: Measurements | null;
   bodyGender: BodyGender;
-  photoIds: string[];
+  photos: PhotoRecord[];
   diagnosisResult: DiagnosisResult | null;
   cascadeScript: CascadeScript | null;
   currentStepIndex: number;
   activeTool: ToolId | null;
+  selectedIssueIndex: number | null;
 
   setPatternId: (id: string) => void;
   setGradedPatternId: (id: string) => void;
   setMeasurementsResponse: (r: MeasurementsResponse) => void;
   setMeasurements: (m: Measurements) => void;
   setBodyGender: (g: BodyGender) => void;
-  setPhotoIds: (ids: string[]) => void;
+  setPhotos: (photos: PhotoRecord[]) => void;
   setDiagnosisResult: (r: DiagnosisResult) => void;
   setCascadeScript: (s: CascadeScript) => void;
   setCurrentStepIndex: (i: number) => void;
   setActiveTool: (tool: ToolId | null) => void;
+  setSelectedIssueIndex: (i: number | null) => void;
   reset: () => void;
 }
 
@@ -67,11 +74,12 @@ const initialState = {
   measurementsResponse: null,
   measurements: null,
   bodyGender: "female" as BodyGender,
-  photoIds: [],
+  photos: [] as PhotoRecord[],
   diagnosisResult: null,
   cascadeScript: null,
   currentStepIndex: 0,
   activeTool: null,
+  selectedIssueIndex: null as number | null,
 };
 
 export const useWizardStore = create<WizardState>()((set) => ({
@@ -81,10 +89,11 @@ export const useWizardStore = create<WizardState>()((set) => ({
   setMeasurementsResponse: (r) => set({ measurementsResponse: r }),
   setMeasurements: (m) => set({ measurements: m }),
   setBodyGender: (g) => set({ bodyGender: g }),
-  setPhotoIds: (ids) => set({ photoIds: ids }),
+  setPhotos: (photos) => set({ photos }),
   setDiagnosisResult: (r) => set({ diagnosisResult: r }),
   setCascadeScript: (s) => set({ cascadeScript: s }),
   setCurrentStepIndex: (i) => set({ currentStepIndex: i }),
   setActiveTool: (tool) => set({ activeTool: tool }),
+  setSelectedIssueIndex: (i) => set({ selectedIssueIndex: i }),
   reset: () => set(initialState),
 }));

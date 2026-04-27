@@ -1,4 +1,4 @@
-# Muslin — Project Context
+# Iris Tailor — Project Context
 
 > The expert sewing friend you don't have. Home sewers upload a photo of themselves in a muslin (test garment) and get back an adjusted pattern that actually fits, with each change animated and explained.
 
