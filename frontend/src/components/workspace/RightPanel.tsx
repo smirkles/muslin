@@ -91,7 +91,6 @@ function EmptyGuide({ onToolSelect }: { onToolSelect: (t: "measurements" | "phot
     { icon: "📏", label: "Enter measurements", tool: "measurements" as const, color: "bg-emerald-50 border-emerald-200 text-emerald-700" },
     { icon: "📷", label: "Upload muslin photos", tool: "photos" as const, color: "bg-sky-50 border-sky-200 text-sky-700" },
     { icon: "🧠", label: "Run diagnosis", tool: "diagnosis" as const, color: "bg-rose-50 border-rose-200 text-rose-700" },
-    { icon: "✨", label: "Apply adjustments", tool: "cascade" as const, color: "bg-violet-50 border-violet-200 text-violet-700" },
   ];
 
   return (
