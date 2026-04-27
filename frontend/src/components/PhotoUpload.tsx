@@ -21,12 +21,42 @@ interface PhotoUploadProps {
   onSuccess: (photos: PhotoRecord[]) => void;
 }
 
+const SAMPLE_PHOTOS: { path: string; label: ViewLabel }[] = [
+  { path: "/sample-photos/front.png", label: "front" },
+  { path: "/sample-photos/side.png", label: "side" },
+  { path: "/sample-photos/back.png", label: "back" },
+];
+
 export function PhotoUpload({ measurementId, onSuccess }: PhotoUploadProps) {
   const [selectedFiles, setSelectedFiles] = useState<SelectedFile[]>([]);
   const [globalError, setGlobalError] = useState<string>("");
   const [apiError, setApiError] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
+  const [isLoadingSamples, setIsLoadingSamples] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  async function handleUseSamples() {
+    setIsLoadingSamples(true);
+    setGlobalError("");
+    setApiError("");
+    try {
+      const loaded = await Promise.all(
+        SAMPLE_PHOTOS.map(async ({ path, label }) => {
+          const res = await fetch(path);
+          const blob = await res.blob();
+          const filename = path.split("/").pop()!;
+          const file = new File([blob], filename, { type: blob.type || "image/png" });
+          return { file, objectUrl: URL.createObjectURL(file), label, error: undefined } satisfies SelectedFile;
+        }),
+      );
+      selectedFiles.forEach((s) => URL.revokeObjectURL(s.objectUrl));
+      setSelectedFiles(loaded);
+    } catch {
+      setGlobalError("Failed to load sample photos.");
+    } finally {
+      setIsLoadingSamples(false);
+    }
+  }
 
   function processNewFiles(newFiles: File[]) {
     setApiError("");
@@ -135,6 +165,16 @@ export function PhotoUpload({ measurementId, onSuccess }: PhotoUploadProps) {
         <p className="mt-1 text-xs text-gray-400">Drag &amp; drop or click to browse</p>
         <p className="mt-1 text-xs text-gray-400">JPEG or PNG · Up to 3 files · Max 10 MB each</p>
       </div>
+
+      {/* Sample photos shortcut */}
+      <button
+        type="button"
+        onClick={handleUseSamples}
+        disabled={isLoadingSamples || isUploading}
+        className="w-full rounded border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm text-indigo-600 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {isLoadingSamples ? "Loading…" : "Use sample photos"}
+      </button>
 
       {/* File input — visually hidden but accessible to assistive tech and tests */}
       <input
