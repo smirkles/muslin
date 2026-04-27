@@ -3,10 +3,9 @@
 The SMPL model is loaded once on first call and cached for subsequent requests.
 Model loading takes ~2 seconds for a 40 MB pkl file.
 
-Fails fast at import if SMPL_NEUTRAL.pkl is missing (so the server won't start
-with a broken config), but defers the smplx import + model creation until the
-first generate_mesh() call so that other test modules can import main without
-requiring a real smplx install.
+The model file check is deferred to first call so the server can start without
+SMPL_NEUTRAL.pkl present (e.g. on Railway). Only the body mesh endpoint fails
+when the file is missing.
 """
 
 from __future__ import annotations
@@ -23,12 +22,6 @@ import trimesh
 _PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
 _MODEL_PATH = _PROJECT_ROOT / "assets" / "smpl_models" / "smpl" / "SMPL_NEUTRAL.pkl"
 
-if not _MODEL_PATH.exists():
-    raise FileNotFoundError(
-        f"SMPL_NEUTRAL.pkl not found at {_MODEL_PATH}. "
-        "See docs/setup.md for model download instructions."
-    )
-
 # ---------------------------------------------------------------------------
 # Module-level model cache — populated on first generate_mesh() call
 # ---------------------------------------------------------------------------
@@ -40,6 +33,11 @@ def _get_model():
     """Return the cached smplx model, loading it on first call."""
     global _smpl_model
     if _smpl_model is None:
+        if not _MODEL_PATH.exists():
+            raise FileNotFoundError(
+                f"SMPL_NEUTRAL.pkl not found at {_MODEL_PATH}. "
+                "See docs/setup.md for model download instructions."
+            )
         import smplx  # noqa: PLC0415
 
         _smpl_model = smplx.create(
