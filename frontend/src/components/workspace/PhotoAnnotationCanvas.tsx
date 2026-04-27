@@ -16,21 +16,33 @@ interface RegionHint {
 function getRegionForIssue(issueType: string): RegionHint {
   const t = issueType.toLowerCase().replace(/[_\s-]+/g, " ");
 
-  // Neck / collar / neckline — checked before "back" so "neckline_gaping_at_back" lands here, not upper-back
+  // CB / back neckline — must precede general neck check
+  if ((t.includes("cb") || t.startsWith("back")) && t.includes("neck")) {
+    return { cx: 50, cy: 22, rx: 18, ry: 7, preferredView: "back" };
+  }
+  // Front neckline / collar — general neck
   if (t.includes("neck") || t.includes("collar")) {
     return { cx: 50, cy: 22, rx: 18, ry: 7, preferredView: "front" };
   }
-  // Shoulder — separate from neck
+  // Shoulder
   if (t.includes("shoulder")) {
     return { cx: 50, cy: 30, rx: 26, ry: 8, preferredView: "front" };
   }
-  // Sleeve / armhole
+  // Sleeve pitch — rotation best seen from the side
+  if (t.includes("sleeve") && t.includes("pitch")) {
+    return { cx: 50, cy: 32, rx: 22, ry: 10, preferredView: "side" };
+  }
+  // Sleeve length — annotation at wrist level
+  if (t.includes("sleeve") && t.includes("length")) {
+    return { cx: 50, cy: 44, rx: 26, ry: 6, preferredView: "front" };
+  }
+  // Sleeve / armhole (general)
   if (t.includes("sleeve") || t.includes("armhole") || t.includes("arm")) {
     return { cx: 50, cy: 35, rx: 28, ry: 9, preferredView: "front" };
   }
   // Bust / chest / dart
   if (t.includes("bust") || t.includes("chest") || t.includes("fba") || t.includes("dart")) {
-    return { cx: 50, cy: 36, rx: 18, ry: 10, preferredView: "front" };
+    return { cx: 50, cy: 37, rx: 18, ry: 10, preferredView: "front" };
   }
   // Waist
   if (t.includes("waist")) {
@@ -40,8 +52,16 @@ function getRegionForIssue(issueType: string): RegionHint {
   if (t.includes("hip") || t.includes("seat")) {
     return { cx: 50, cy: 60, rx: 20, ry: 8, preferredView: "front" };
   }
-  // Hem — bottom of garment
+  // Back hem (cupping etc.) — must precede general hem and general back checks
+  if (t.includes("back") && t.includes("hem")) {
+    return { cx: 50, cy: 80, rx: 22, ry: 6, preferredView: "back" };
+  }
+  // Hem — bottom of garment (front view)
   if (t.includes("hem")) {
+    return { cx: 50, cy: 80, rx: 22, ry: 6, preferredView: "front" };
+  }
+  // Garment too short / length issues without a body-part keyword
+  if (t.includes("short") || t.includes("length")) {
     return { cx: 50, cy: 80, rx: 22, ry: 6, preferredView: "front" };
   }
   // Swayback / lower back
